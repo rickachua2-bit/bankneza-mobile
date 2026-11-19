@@ -46,6 +46,11 @@ export const portalApi = {
     apiRequest('/api/portal/login', { method: 'POST', body, auth: false }),
   register: (body: { fullName: string; email: string; phone: string; password: string; bvn?: string; referralCode?: string }) =>
     apiRequest('/api/portal/register', { method: 'POST', body, auth: false }),
+  verifyEmail: (body: { email: string; code: string }) =>
+    apiRequest('/api/portal/verify-email', { method: 'POST', body, auth: false }),
+  resendOtp: (email: string) =>
+    apiRequest('/api/portal/resend-otp', { method: 'POST', body: { email }, auth: false }),
+  getNotifications: () => apiRequest('/api/portal/notifications'),
   getMe: () => apiRequest('/api/portal/me'),
   getBanks: () => apiRequest('/api/portal/banks'),
   resolveAccount: (body: { bankCode: string; accountNumber: string }) =>
@@ -74,6 +79,8 @@ export const portalApi = {
     apiRequest('/api/portal/cards/physical-order', { method: 'POST', body }),
   upgradeKyc: (bvn: string) =>
     apiRequest('/api/portal/kyc/upgrade', { method: 'POST', body: { bvn } }),
+  submitKyc: (body: { bvn?: string; nin?: string; rcNumber?: string }) =>
+    apiRequest('/api/portal/kyc/upgrade', { method: 'POST', body }),
   setup2fa: () => apiRequest('/api/portal/security/2fa/setup', { method: 'POST' }),
   verify2fa: (code: string) => apiRequest('/api/portal/security/2fa/verify', { method: 'POST', body: { code } }),
   getSupportTickets: () => apiRequest('/api/portal/support/tickets'),

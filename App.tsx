@@ -107,23 +107,40 @@ function MainShell() {
     );
   }
 
-  const showServices = ['FLIGHTS', 'BETTING_VAS', 'FX', 'GLOBAL_PAYOUTS', 'CRYPTO'].some((k) => isFeatureEnabled(theme, k));
-  const allTabs: Array<{ key: TabKey; label: string; icon: any; show: boolean }> = [
-    { key: 'home', label: 'Home', icon: 'home', show: true },
-    { key: 'transfer', label: 'Transfer', icon: 'send', show: isFeatureEnabled(theme, 'TRANSFERS') },
-    { key: 'bills', label: 'Bills', icon: 'flash', show: isFeatureEnabled(theme, 'BILLS') },
-    { key: 'cards', label: 'Cards', icon: 'card', show: isFeatureEnabled(theme, 'VIRTUAL_CARDS') || isFeatureEnabled(theme, 'PHYSICAL_CARDS') },
-    { key: 'services', label: 'Global', icon: 'globe', show: showServices },
-    { key: 'profile', label: 'More', icon: 'person', show: true },
+  const allTabs: Array<{ key: TabKey; label: string; icon: any; iconOutline: any; show: boolean }> = [
+    { key: 'home', label: 'Home', icon: 'home', iconOutline: 'home-outline', show: true },
+    { key: 'transfer', label: 'Send', icon: 'paper-plane', iconOutline: 'paper-plane-outline', show: isFeatureEnabled(theme, 'TRANSFERS') },
+    { key: 'bills', label: 'Bills', icon: 'flash', iconOutline: 'flash-outline', show: isFeatureEnabled(theme, 'BILLS') },
+    { key: 'cards', label: 'Cards', icon: 'card', iconOutline: 'card-outline', show: isFeatureEnabled(theme, 'VIRTUAL_CARDS') || isFeatureEnabled(theme, 'PHYSICAL_CARDS') },
+    { key: 'profile', label: 'Profile', icon: 'person', iconOutline: 'person-outline', show: true },
   ];
   const tabs = allTabs.filter((t) => t.show);
+  const bg = theme.isDark ? '#0B0F1A' : '#F3F6FB';
+  const navBg = theme.isDark ? '#141B2D' : '#FFFFFF';
+  const navBorder = theme.isDark ? '#1E293B' : '#E2E8F0';
+  const tabTitleMap: Record<TabKey, string> = {
+    home: theme.brandName,
+    transfer: 'Send Money',
+    bills: 'Bills & Utilities',
+    cards: 'Virtual & Physical Cards',
+    services: 'Global FX, Flights & More',
+    profile: 'Profile, KYC & Security',
+  };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={[styles.header, { backgroundColor: theme.primaryColor }]}>
-        <Text style={styles.headerBrand}>{theme.brandName}</Text>
-        <Text style={styles.headerSub}>Tier {customer.kycTier}</Text>
-      </View>
+    <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={['top', 'bottom']}>
+      <StatusBar style={theme.isDark ? 'light' : 'dark'} />
+      {tab !== 'home' && (
+        <View style={[styles.subHeader, { backgroundColor: navBg, borderBottomColor: navBorder }]}>
+          <TouchableOpacity onPress={() => setTab('home')} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={20} color={theme.isDark ? '#F8FAFC' : theme.primaryColor} />
+          </TouchableOpacity>
+          <Text style={[styles.subHeaderTitle, { color: theme.isDark ? '#F8FAFC' : theme.primaryColor }]}>
+            {tabTitleMap[tab]}
+          </Text>
+          <View style={{ width: 32 }} />
+        </View>
+      )}
 
       <View style={{ flex: 1 }}>
         {tab === 'home' && <HomeScreen customer={customer} onNavigate={setTab} onRefresh={() => loadCustomer(true)} />}
@@ -134,13 +151,15 @@ function MainShell() {
         {tab === 'profile' && <ProfileSupportScreen customer={customer} onRefresh={() => loadCustomer(true)} onSignOut={() => setCustomer(null)} />}
       </View>
 
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { backgroundColor: navBg, borderTopColor: navBorder }]}>
         {tabs.map((t) => {
-          const active = tab === t.key;
+          const active = tab === t.key || (t.key === 'bills' && tab === 'services');
           return (
             <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={styles.navItem}>
-              <Ionicons name={t.icon} size={20} color={active ? theme.accentColor : '#64748b'} />
-              <Text style={{ fontSize: 11, fontWeight: '700', color: active ? theme.accentColor : '#64748b', marginTop: 2 }}>
+              <View style={[styles.navPill, active && { backgroundColor: `${theme.accentColor}1E` }]}>
+                <Ionicons name={active ? t.icon : t.iconOutline} size={21} color={active ? theme.accentColor : '#64748B'} />
+              </View>
+              <Text style={{ fontSize: 10.5, fontWeight: active ? '800' : '600', color: active ? theme.accentColor : '#64748B', marginTop: 2 }}>
                 {t.label}
               </Text>
             </TouchableOpacity>
@@ -155,7 +174,6 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <StatusBar style="light" />
         <MainShell />
       </ThemeProvider>
     </SafeAreaProvider>
@@ -163,11 +181,12 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f1f5f9' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
-  header: { paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerBrand: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
-  headerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
-  bottomNav: { flexDirection: 'row', backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingVertical: 8 },
+  safe: { flex: 1, backgroundColor: '#F3F6FB' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F6FB' },
+  subHeader: { paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1 },
+  backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  subHeaderTitle: { fontSize: 16, fontWeight: '800' },
+  bottomNav: { flexDirection: 'row', borderTopWidth: 1, paddingTop: 8, paddingBottom: 6, shadowColor: '#0f172a', shadowOpacity: 0.06, shadowRadius: 10, elevation: 8 },
   navItem: { flex: 1, alignItems: 'center' },
+  navPill: { paddingHorizontal: 14, paddingVertical: 4, borderRadius: 999 },
 });
