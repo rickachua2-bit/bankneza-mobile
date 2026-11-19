@@ -48,26 +48,41 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
     <ScrollView contentContainerStyle={{ padding: 16 }}>
       <Card>
         <Text style={[styles.title, { color: theme.primaryColor }]}>My Virtual Cards</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-          <PrimaryButton title="+ USD Visa" onPress={() => issueCard('VISA', 'USD')} color={theme.accentColor} disabled={loading} />
-          <PrimaryButton title="+ NGN Verve" onPress={() => issueCard('VERVE', 'NGN')} color={theme.primaryColor} disabled={loading} />
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+          <View style={{ flex: 1 }}>
+            <PrimaryButton title="+ USD Visa" onPress={() => issueCard('VISA', 'USD')} color={theme.accentColor} disabled={loading} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <PrimaryButton title="+ NGN Verve" onPress={() => issueCard('VERVE', 'NGN')} color={theme.primaryColor} disabled={loading} />
+          </View>
         </View>
+
         {vCards.length === 0 ? (
           <Text style={{ color: '#64748b', fontSize: 13 }}>No virtual cards issued yet.</Text>
         ) : (
-          vCards.map((vc: any) => (
-            <View key={vc.id} style={styles.cardRow}>
-              <View>
-                <Text style={{ fontWeight: '800', color: '#0f172a' }}>{vc.cardScheme} • {vc.maskedPan}</Text>
-                <Text style={{ fontSize: 12, color: '#64748b' }}>Exp: {vc.expiryMonth}/{vc.expiryYear} • {vc.currency} {vc.balance} • {vc.status}</Text>
+          vCards.map((vc: any) => {
+            const cardBg = vc.currency === 'USD' ? theme.primaryColor : '#065f46';
+            return (
+              <View key={vc.id} style={[styles.visualCard, { backgroundColor: cardBg }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.cardBrand}>{theme.brandName} • {vc.cardScheme}</Text>
+                  <TouchableOpacity onPress={() => toggleCard(vc.id, vc.status)} style={styles.freezePill}>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>
+                      {vc.status === 'ACTIVE' ? 'Freeze' : 'Unfreeze'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.cardPan}>{vc.maskedPan}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <View>
+                    <Text style={styles.cardMeta}>EXP {vc.expiryMonth}/{vc.expiryYear}</Text>
+                    <Text style={styles.cardHolder}>{customer?.fullName?.toUpperCase()}</Text>
+                  </View>
+                  <Text style={styles.cardBal}>{vc.currency === 'USD' ? '$' : '₦'}{Number(vc.balance || 0).toLocaleString()}</Text>
+                </View>
               </View>
-              <TouchableOpacity onPress={() => toggleCard(vc.id, vc.status)} style={styles.freezeBtn}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.primaryColor }}>
-                  {vc.status === 'ACTIVE' ? 'Freeze' : 'Unfreeze'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ))
+            );
+          })
         )}
       </Card>
 
@@ -83,6 +98,11 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
 
 const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '800', marginBottom: 12 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  freezeBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#eff6ff' },
+  visualCard: { borderRadius: 16, padding: 18, marginBottom: 12 },
+  cardBrand: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  freezePill: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99 },
+  cardPan: { color: '#ffffff', fontSize: 20, fontWeight: '900', letterSpacing: 2, marginVertical: 18 },
+  cardMeta: { color: 'rgba(255,255,255,0.75)', fontSize: 11 },
+  cardHolder: { color: '#ffffff', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  cardBal: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
 });

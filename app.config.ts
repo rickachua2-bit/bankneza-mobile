@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => {
@@ -10,6 +11,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const apiBaseUrl = process.env.API_BASE_URL || `https://${tenantSlug}.slikpay.online`;
   const versionName = process.env.VERSION_NAME || '1.0.0';
   const buildNumber = String(process.env.BUILD_NUMBER || '1');
+  const hasIcon = fs.existsSync('./assets/icon.png');
+  const hasSplash = fs.existsSync('./assets/splash.png');
 
   return {
     ...config,
@@ -19,7 +22,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     version: versionName,
     orientation: 'portrait',
     userInterfaceStyle: 'light',
+    icon: hasIcon ? './assets/icon.png' : undefined,
     splash: {
+      image: hasSplash ? './assets/splash.png' : undefined,
       backgroundColor: primaryColor,
       resizeMode: 'contain',
     },

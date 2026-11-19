@@ -1,8 +1,9 @@
-import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Modal, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { Ionicons } from '@expo/vector-icons';
 import { useTenantTheme } from '../theme/ThemeProvider';
-import { Card } from '../components/Ui';
+import { Card, PrimaryButton } from '../components/Ui';
 
 export function HomeScreen({
   customer,
@@ -14,6 +15,8 @@ export function HomeScreen({
   onRefresh: () => void;
 }) {
   const theme = useTenantTheme();
+  const [hideBal, setHideBal] = useState(false);
+  const [receiptTx, setReceiptTx] = useState<any>(null);
   const fmt = (n: number) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
   const txs = Array.isArray(customer?.transactions) ? customer.transactions : [];
 
@@ -23,16 +26,27 @@ export function HomeScreen({
     Alert.alert('Copied', `Account number ${customer.virtualAccountNumber} copied!`);
   };
 
+  const shareReceipt = async (tx: any) => {
+    await Share.share({
+      message: `${theme.brandName} Transaction Receipt\nType: ${tx.type}\nAmount: ${fmt(Math.abs(tx.amountNgn))}\nDetails: ${tx.description}\nReference: ${tx.reference}\nDate: ${new Date(tx.createdAt).toLocaleString()}\nStatus: ${tx.status || 'SUCCESS'}`,
+    });
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={[styles.walletCard, { backgroundColor: theme.primaryColor }]}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={styles.walletLabel}>Available NGN Balance</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.walletLabel}>Available NGN Balance</Text>
+            <TouchableOpacity onPress={() => setHideBal(!hideBal)}>
+              <Ionicons name={hideBal ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.85)" />
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity onPress={onRefresh}>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>↻ Refresh</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.walletAmt}>{fmt(customer?.walletBalanceNgn)}</Text>
+        <Text style={styles.walletAmt}>{hideBal ? '₦ ••••••' : fmt(customer?.walletBalanceNgn)}</Text>
 
         <View style={styles.vaBox}>
           <View style={{ flex: 1 }}>
@@ -49,12 +63,13 @@ export function HomeScreen({
 
       <View style={styles.actionsRow}>
         {[
-          { key: 'transfer', label: 'Send Money' },
-          { key: 'bills', label: 'Pay Bills' },
-          { key: 'cards', label: 'Cards' },
-          { key: 'profile', label: 'KYC & 2FA' },
+          { key: 'transfer', label: 'Send', icon: 'send' },
+          { key: 'bills', label: 'Bills', icon: 'flash' },
+          { key: 'cards', label: 'Cards', icon: 'card' },
+          { key: 'profile', label: 'KYC & 2FA', icon: 'shield-checkmark' },
         ].map((a) => (
           <TouchableOpacity key={a.key} onPress={() => onNavigate(a.key as any)} style={styles.actionBtn}>
+            <Ionicons name={a.icon as any} size={20} color={theme.accentColor} style={{ marginBottom: 4 }} />
             <Text style={[styles.actionTxt, { color: theme.primaryColor }]}>{a.label}</Text>
           </TouchableOpacity>
         ))}
@@ -65,10 +80,10 @@ export function HomeScreen({
         {txs.length === 0 ? (
           <Text style={{ color: '#64748b', fontSize: 13 }}>No transactions yet. Fund your NGN account above to begin.</Text>
         ) : (
-          txs.slice(0, 12).map((t: any) => {
+          txs.slice(0, 15).map((t: any) => {
             const isPos = Number(t.amountNgn || 0) >= 0;
             return (
-              <View key={t.id} style={styles.txRow}>
+              <TouchableOpacity key={t.id} onPress={() => setReceiptTx(t)} style={styles.txRow}>
                 <View style={{ flex: 1, paddingRight: 8 }}>
                   <Text style={styles.txDesc} numberOfLines={1}>{t.description}</Text>
                   <Text style={styles.txMeta}>{t.type} • {new Date(t.createdAt).toLocaleDateString()}</Text>
@@ -76,11 +91,34 @@ export function HomeScreen({
                 <Text style={{ fontWeight: '800', color: isPos ? '#059669' : '#dc2626' }}>
                   {isPos ? '+' : '-'}{fmt(Math.abs(t.amountNgn))}
                 </Text>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
       </Card>
+
+      <Modal visible={Boolean(receiptTx)} transparent animationType="slide" onRequestClose={() => setReceiptTx(null)}>
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.sectionTitle, { color: theme.primaryColor, textAlign: 'center' }]}>Transaction Receipt</Text>
+            {receiptTx && (
+              <>
+                <Text style={{ fontSize: 26, fontWeight: '900', textAlign: 'center', color: '#0f172a', marginVertical: 8 }}>
+                  {fmt(Math.abs(receiptTx.amountNgn))}
+                </Text>
+                <Text style={{ fontSize: 13, color: '#475569', marginBottom: 6 }}>Type: {receiptTx.type}</Text>
+                <Text style={{ fontSize: 13, color: '#475569', marginBottom: 6 }}>Details: {receiptTx.description}</Text>
+                <Text style={{ fontSize: 13, color: '#475569', marginBottom: 6 }}>Ref: {receiptTx.reference}</Text>
+                <Text style={{ fontSize: 13, color: '#059669', fontWeight: '700', marginBottom: 14 }}>Status: {receiptTx.status || 'SUCCESS'}</Text>
+                <View style={{ gap: 8 }}>
+                  <PrimaryButton title="Share Receipt" onPress={() => shareReceipt(receiptTx)} color={theme.accentColor} />
+                  <PrimaryButton title="Close" onPress={() => setReceiptTx(null)} color="#64748b" />
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -88,7 +126,7 @@ export function HomeScreen({
 const styles = StyleSheet.create({
   container: { padding: 16 },
   walletCard: { borderRadius: 18, padding: 20, marginBottom: 14 },
-  walletLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12.5, fontWeight: '600' },
+  walletLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 12.5, fontWeight: '600' },
   walletAmt: { color: '#ffffff', fontSize: 30, fontWeight: '900', marginVertical: 8 },
   vaBox: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', marginTop: 6 },
   vaBank: { color: 'rgba(255,255,255,0.75)', fontSize: 11 },
@@ -101,4 +139,6 @@ const styles = StyleSheet.create({
   txRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   txDesc: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
   txMeta: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20 },
 });

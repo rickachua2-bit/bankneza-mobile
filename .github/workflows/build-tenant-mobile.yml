@@ -38,6 +38,10 @@ on:
       apiBaseUrl:
         required: true
         type: string
+      logoUrl:
+        required: false
+        default: ''
+        type: string
       callbackUrl:
         required: true
         type: string
@@ -59,6 +63,16 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Prepare Branded Icon & Splash
+        env:
+          LOGO_URL: ${{ inputs.logoUrl }}
+        run: |
+          mkdir -p assets
+          if [ -n "$LOGO_URL" ]; then
+            curl -fsSL "$LOGO_URL" -o assets/icon.png || true
+            cp assets/icon.png assets/splash.png 2>/dev/null || true
+          fi
 
       - name: Run EAS Cloud Build
         id: eas
