@@ -1,0 +1,99 @@
+name: Bankneza White-Label Mobile Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      buildId:
+        required: true
+        type: string
+      tenantSlug:
+        required: true
+        type: string
+      appName:
+        required: true
+        type: string
+      androidPackageId:
+        required: true
+        type: string
+      iosBundleId:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      versionName:
+        required: true
+        type: string
+      buildNumber:
+        required: true
+        type: string
+      primaryColor:
+        required: false
+        default: '#001C71'
+        type: string
+      accentColor:
+        required: false
+        default: '#0066FF'
+        type: string
+      apiBaseUrl:
+        required: true
+        type: string
+      callbackUrl:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run EAS Cloud Build
+        id: eas
+        env:
+          TENANT_SLUG: ${{ inputs.tenantSlug }}
+          APP_NAME: ${{ inputs.appName }}
+          ANDROID_PACKAGE: ${{ inputs.androidPackageId }}
+          IOS_BUNDLE_ID: ${{ inputs.iosBundleId }}
+          VERSION_NAME: ${{ inputs.versionName }}
+          BUILD_NUMBER: ${{ inputs.buildNumber }}
+          PRIMARY_COLOR: ${{ inputs.primaryColor }}
+          ACCENT_COLOR: ${{ inputs.accentColor }}
+          API_BASE_URL: ${{ inputs.apiBaseUrl }}
+          EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
+        run: |
+          if [ "${{ inputs.platform }}" = "ANDROID_APK" ]; then
+            OUT=$(eas build --platform android --profile preview-apk --non-interactive --json)
+          elif [ "${{ inputs.platform }}" = "ANDROID_AAB" ]; then
+            OUT=$(eas build --platform android --profile production --non-interactive --json)
+          elif [ "${{ inputs.platform }}" = "IOS_IPA" ]; then
+            OUT=$(eas build --platform ios --profile production --non-interactive --json)
+          else
+            OUT=$(eas build --platform all --profile production --non-interactive --json)
+          fi
+          ARTIFACT_URL=$(echo "$OUT" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); const item=Array.isArray(d)?d[0]:d; console.log(item?.artifacts?.buildUrl || item?.buildUrl || '');")
+          echo "artifact_url=$ARTIFACT_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Bankneza Mobile Factory
+        if: always()
+        run: |
+          STATUS="COMPLETED"
+          if [ "${{ job.status }}" != "success" ] || [ -z "${{ steps.eas.outputs.artifact_url }}" ]; then
+            STATUS="FAILED"
+          fi
+          curl -s -X POST "${{ inputs.callbackUrl }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Build-Secret: ${{ secrets.MOBILE_BUILD_CALLBACK_SECRET }}" \
+            -d "{\"status\":\"$STATUS\",\"artifactUrl\":\"${{ steps.eas.outputs.artifact_url }}\"}"
