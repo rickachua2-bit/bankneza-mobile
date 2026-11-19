@@ -83,6 +83,9 @@ export const portalApi = {
     apiRequest('/api/portal/kyc/upgrade', { method: 'POST', body }),
   setup2fa: () => apiRequest('/api/portal/security/2fa/setup', { method: 'POST' }),
   verify2fa: (code: string) => apiRequest('/api/portal/security/2fa/verify', { method: 'POST', body: { code } }),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    apiRequest('/api/portal/security/change-password', { method: 'POST', body }),
+  deleteAccount: () => apiRequest('/api/portal/account', { method: 'DELETE' }),
   getSupportTickets: () => apiRequest('/api/portal/support/tickets'),
   createSupportTicket: (body: { subject: string; category: string; message: string }) =>
     apiRequest('/api/portal/support/tickets', { method: 'POST', body }),

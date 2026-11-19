@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { PrimaryButton } from './src/components/Ui';
 type TabKey = 'home' | 'transfer' | 'bills' | 'cards' | 'services' | 'profile';
 
 function MainShell() {
+  const [fontsLoaded] = useFonts(Ionicons.font);
   const theme = useTenantTheme();
   const [booting, setBooting] = useState(true);
   const [seenOnboarding, setSeenOnboarding] = useState(true);
@@ -60,7 +62,7 @@ function MainShell() {
     if (res.success) setBiometricLocked(false);
   };
 
-  if (booting) {
+  if (booting || !fontsLoaded) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={theme.accentColor} />

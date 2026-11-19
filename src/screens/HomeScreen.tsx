@@ -44,7 +44,14 @@ export function HomeScreen({
 
   const fmt = (n: number) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
   const txs = Array.isArray(customer?.transactions) ? customer.transactions : [];
-  const isKycVerified = customer?.kycStatus === 'VERIFIED' && Boolean(customer?.virtualAccountNumber);
+  const provisionedAccounts: Array<{ currency: string; category?: string; accountNumber: string; bankName: string; accountName?: string; routingNumber?: string; iban?: string }> =
+    Array.isArray(customer?.provisionedAccounts) ? customer.provisionedAccounts : [];
+  const isKycVerified = customer?.kycStatus === 'VERIFIED' || Number(customer?.kycTier || 0) >= 2;
+  const activeAccount =
+    provisionedAccounts.find((a) => a.currency === selectedCurr) ||
+    (selectedCurr === 'NGN' && customer?.virtualAccountNumber
+      ? { currency: 'NGN', accountNumber: customer.virtualAccountNumber, bankName: customer.virtualAccountBank || 'Partner Bank', accountName: customer.virtualAccountName, routingNumber: undefined as string | undefined }
+      : null);
   const firstName = String(customer?.fullName || 'User').split(' ')[0];
   const initials = String(customer?.fullName || 'U')
     .split(' ')
@@ -69,10 +76,11 @@ export function HomeScreen({
     setRefreshing(false);
   };
 
-  const copyAccount = async () => {
-    if (!customer?.virtualAccountNumber) return;
-    await Clipboard.setStringAsync(customer.virtualAccountNumber);
-    Alert.alert('Copied ✓', `Account number ${customer.virtualAccountNumber} copied to clipboard.`);
+  const copyAccount = async (num?: string) => {
+    const target = num || activeAccount?.accountNumber || customer?.virtualAccountNumber;
+    if (!target) return;
+    await Clipboard.setStringAsync(target);
+    Alert.alert('Copied ✓', `Account number ${target} copied to clipboard.`);
   };
 
   const shareReceipt = async (tx: any) => {
@@ -149,19 +157,54 @@ export function HomeScreen({
       );
     }
     return (
-      <View style={[styles.vaBar, { backgroundColor: darkSurface ? 'rgba(255,255,255,0.14)' : '#F1F5F9' }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: darkSurface ? 'rgba(255,255,255,0.8)' : mutedColor }}>
-            {customer.virtualAccountBank} • Dedicated Account
-          </Text>
-          <Text style={{ fontSize: 16, fontWeight: '900', letterSpacing: 1, color: darkSurface ? '#fff' : titleColor, marginTop: 2 }}>
-            {customer.virtualAccountNumber}
-          </Text>
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          {(['NGN', 'USD', 'GBP', 'EUR'] as const).map((c) => {
+            const hasAcc = c === 'NGN' ? Boolean(customer?.virtualAccountNumber || provisionedAccounts.some((a) => a.currency === 'NGN')) : provisionedAccounts.some((a) => a.currency === c);
+            return (
+              <TouchableOpacity
+                key={c}
+                onPress={() => setSelectedCurr(c)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 999,
+                  backgroundColor: selectedCurr === c ? theme.accentColor : darkSurface ? 'rgba(255,255,255,0.16)' : '#E2E8F0',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: selectedCurr === c ? '#fff' : darkSurface ? 'rgba(255,255,255,0.85)' : '#334155' }}>
+                  {c}{hasAcc ? ' ✓' : ''}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        <TouchableOpacity onPress={copyAccount} style={[styles.copyPill, { backgroundColor: theme.accentColor }]}>
-          <Ionicons name="copy-outline" size={13} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11.5 }}>Copy</Text>
-        </TouchableOpacity>
+        <View style={[styles.vaBar, { backgroundColor: darkSurface ? 'rgba(255,255,255,0.14)' : '#F1F5F9' }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: darkSurface ? 'rgba(255,255,255,0.82)' : mutedColor }}>
+              {activeAccount ? `${activeAccount.bankName} • ${activeAccount.currency} Account` : `${selectedCurr} Account • Verified`}
+            </Text>
+            <Text style={{ fontSize: 15.5, fontWeight: '900', letterSpacing: 0.8, color: darkSurface ? '#fff' : titleColor, marginTop: 2 }} numberOfLines={1}>
+              {activeAccount?.accountNumber || 'Syncing Account...'}
+            </Text>
+            {activeAccount?.routingNumber ? (
+              <Text style={{ fontSize: 10.5, color: darkSurface ? 'rgba(255,255,255,0.75)' : mutedColor, marginTop: 1 }}>
+                Routing / Sort: {activeAccount.routingNumber}
+              </Text>
+            ) : null}
+          </View>
+          {activeAccount?.accountNumber ? (
+            <TouchableOpacity onPress={() => copyAccount(activeAccount.accountNumber)} style={[styles.copyPill, { backgroundColor: theme.accentColor }]}>
+              <Ionicons name="copy" size={14} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11.5 }}>Copy</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={handlePullRefresh} style={[styles.copyPill, { backgroundColor: theme.accentColor }]}>
+              <Ionicons name="refresh" size={14} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11.5 }}>Sync</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
@@ -328,8 +371,8 @@ export function HomeScreen({
         <View style={styles.actionGrid}>
           {quickActions.map((a, idx) => (
             <TouchableOpacity key={`${a.label}-${idx}`} onPress={() => onNavigate(a.key as any)} style={styles.actionItem}>
-              <View style={[styles.actionCircle, { backgroundColor: isDark ? `${a.tint}28` : `${a.tint}16` }]}>
-                <Ionicons name={a.icon as any} size={20} color={a.tint} />
+              <View style={[styles.actionCircle, { backgroundColor: isDark ? `${a.tint}32` : `${a.tint}1A`, borderWidth: 1, borderColor: `${a.tint}33` }]}>
+                <Ionicons name={a.icon as any} size={23} color={a.tint} />
               </View>
               <Text style={[styles.actionLabel, { color: titleColor }]} numberOfLines={1}>{a.label}</Text>
             </TouchableOpacity>
