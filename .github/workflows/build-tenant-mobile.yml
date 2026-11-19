@@ -117,14 +117,15 @@ jobs:
           EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
         run: |
           npx expo prebuild --platform android --clean --no-install
+          echo "android.kotlinVersion=1.9.25" >> android/gradle.properties
           cd android
           chmod +x gradlew
           if [ "${{ inputs.platform }}" = "ANDROID_AAB" ]; then
-            ./gradlew bundleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+            ./gradlew bundleRelease --no-daemon --parallel --build-cache -PkotlinVersion=1.9.25 -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
             ARTIFACT_FILE=$(find app/build/outputs/bundle/release -name "*.aab" | head -n 1)
             EXT="aab"
           else
-            ./gradlew assembleRelease --no-daemon --parallel --build-cache -PreactNativeArchitectures=arm64-v8a
+            ./gradlew assembleRelease --no-daemon --parallel --build-cache -PkotlinVersion=1.9.25 -PreactNativeArchitectures=arm64-v8a
             ARTIFACT_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
             EXT="apk"
           fi
