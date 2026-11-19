@@ -42,6 +42,14 @@ on:
         required: false
         default: ''
         type: string
+      splashUrl:
+        required: false
+        default: ''
+        type: string
+      splashBgColor:
+        required: false
+        default: '#001C71'
+        type: string
       callbackUrl:
         required: true
         type: string
@@ -75,10 +83,15 @@ jobs:
       - name: Prepare Branded Icon & Splash
         env:
           LOGO_URL: ${{ inputs.logoUrl }}
+          SPLASH_URL: ${{ inputs.splashUrl }}
         run: |
           mkdir -p assets
           if [ -n "$LOGO_URL" ]; then
             curl -fsSL "$LOGO_URL" -o assets/icon.png || true
+          fi
+          if [ -n "$SPLASH_URL" ]; then
+            curl -fsSL "$SPLASH_URL" -o assets/splash.png || cp assets/icon.png assets/splash.png 2>/dev/null || true
+          else
             cp assets/icon.png assets/splash.png 2>/dev/null || true
           fi
 

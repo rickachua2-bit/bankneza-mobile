@@ -1,0 +1,66 @@
+name: Bankneza Direct Store Publisher (Google Play & App Store)
+
+on:
+  workflow_dispatch:
+    inputs:
+      buildId:
+        required: true
+        type: string
+      store:
+        required: true
+        type: string
+      credsUrl:
+        required: true
+        type: string
+
+jobs:
+  publish-google-play:
+    if: inputs.store == 'GOOGLE_PLAY'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Encrypted Store Config & Artifact
+        id: fetch
+        run: |
+          RESP=$(curl -fsSL -H "X-Build-Secret: ${{ secrets.MOBILE_BUILD_CALLBACK_SECRET }}" "${{ inputs.credsUrl }}")
+          echo "$RESP" | node -e "
+            const fs = require('fs');
+            const d = JSON.parse(fs.readFileSync(0,'utf8')).data;
+            fs.writeFileSync('service-account.json', d.serviceAccountJson);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'package_name=' + d.packageName + '\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'track=' + (d.track || 'internal') + '\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'artifact_url=' + d.artifactUrl + '\n');
+          "
+          curl -fsSL "${{ steps.fetch.outputs.artifact_url }}" -o release.aab
+
+      - name: Upload AAB to Google Play Console
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: service-account.json
+          packageName: ${{ steps.fetch.outputs.package_name }}
+          releaseFiles: release.aab
+          track: ${{ steps.fetch.outputs.track }}
+          status: completed
+
+  publish-app-store:
+    if: inputs.store == 'APP_STORE'
+    runs-on: macos-latest
+    steps:
+      - name: Fetch Encrypted App Store Connect Key & IPA
+        id: fetch
+        run: |
+          RESP=$(curl -fsSL -H "X-Build-Secret: ${{ secrets.MOBILE_BUILD_CALLBACK_SECRET }}" "${{ inputs.credsUrl }}")
+          echo "$RESP" | node -e "
+            const fs = require('fs');
+            const d = JSON.parse(fs.readFileSync(0,'utf8')).data;
+            fs.writeFileSync('AuthKey.p8', d.privateKeyP8);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'key_id=' + d.keyId + '\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'issuer_id=' + d.issuerId + '\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'artifact_url=' + d.artifactUrl + '\n');
+          "
+          curl -fsSL "${{ steps.fetch.outputs.artifact_url }}" -o release.ipa
+
+      - name: Upload IPA to App Store Connect / TestFlight
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          cp AuthKey.p8 ~/.appstoreconnect/private_keys/AuthKey_${{ steps.fetch.outputs.key_id }}.p8
+          xcrun altool --upload-app -f release.ipa -t ios --apiKey "${{ steps.fetch.outputs.key_id }}" --apiIssuer "${{ steps.fetch.outputs.issuer_id }}"

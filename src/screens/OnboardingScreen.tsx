@@ -1,31 +1,35 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTenantTheme } from '../theme/ThemeProvider';
 import { PrimaryButton } from '../components/Ui';
 
-const SLIDES = [
+const DEFAULT_SLIDES = [
   {
     icon: 'wallet',
     title: 'Instant NGN Virtual Accounts',
     desc: 'Receive bank transfers in seconds and send money to 700+ Nigerian banks with zero stress.',
+    imageUrl: '',
   },
   {
     icon: 'card',
     title: 'Global USD & NGN Cards',
     desc: 'Issue 3D-Secure virtual Visa & Mastercard cards for global SaaS, shopping, and subscriptions.',
+    imageUrl: '',
   },
   {
     icon: 'shield-checkmark',
     title: 'Bills, Cashback & 2FA Security',
     desc: 'Pay airtime, data, power & cable bills, earn cashback rewards, and protect your wallet with 2FA & Biometrics.',
+    imageUrl: '',
   },
-] as const;
+];
 
 export function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const theme = useTenantTheme();
+  const slides = theme.onboardingSlides && theme.onboardingSlides.length > 0 ? theme.onboardingSlides : DEFAULT_SLIDES;
   const [step, setStep] = useState(0);
-  const slide = SLIDES[step];
+  const slide = slides[Math.min(step, slides.length - 1)];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primaryColor }]}>
@@ -34,15 +38,19 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
       </TouchableOpacity>
 
       <View style={styles.center}>
-        <View style={[styles.iconCircle, { backgroundColor: theme.accentColor }]}>
-          <Ionicons name={slide.icon as any} size={52} color="#ffffff" />
-        </View>
+        {slide.imageUrl ? (
+          <Image source={{ uri: slide.imageUrl }} style={{ width: 220, height: 220, borderRadius: 24, marginBottom: 22 }} resizeMode="cover" />
+        ) : (
+          <View style={[styles.iconCircle, { backgroundColor: theme.accentColor }]}>
+            <Ionicons name={(slide.icon || 'wallet') as any} size={52} color="#ffffff" />
+          </View>
+        )}
         <Text style={styles.brand}>{theme.brandName}</Text>
         <Text style={styles.title}>{slide.title}</Text>
         <Text style={styles.desc}>{slide.desc}</Text>
 
         <View style={styles.dots}>
-          {SLIDES.map((_, idx) => (
+          {slides.map((_, idx) => (
             <View
               key={idx}
               style={[
@@ -56,8 +64,8 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
       <View style={{ width: '100%' }}>
         <PrimaryButton
-          title={step < SLIDES.length - 1 ? 'Next →' : 'Get Started →'}
-          onPress={() => (step < SLIDES.length - 1 ? setStep(step + 1) : onDone())}
+          title={step < slides.length - 1 ? 'Next →' : 'Get Started →'}
+          onPress={() => (step < slides.length - 1 ? setStep(step + 1) : onDone())}
           color={theme.accentColor}
         />
       </View>

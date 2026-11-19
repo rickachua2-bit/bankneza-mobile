@@ -2,6 +2,13 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { portalApi } from '../services/api';
 
+export interface OnboardingSlide {
+  title: string;
+  desc: string;
+  imageUrl?: string;
+  icon?: string;
+}
+
 export interface TenantTheme {
   brandName: string;
   primaryColor: string;
@@ -10,6 +17,7 @@ export interface TenantTheme {
   logoUrl?: string;
   supportEmail?: string;
   enabledModules: string[];
+  onboardingSlides: OnboardingSlide[];
 }
 
 const extra = (Constants.expoConfig?.extra || {}) as Record<string, string>;
@@ -20,6 +28,7 @@ const defaultTheme: TenantTheme = {
   secondaryColor: '#000F3D',
   accentColor: extra.accentColor || '#0066FF',
   enabledModules: [],
+  onboardingSlides: [],
 };
 
 export function isFeatureEnabled(theme: TenantTheme, code: string): boolean {
@@ -44,6 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           logoUrl: d.logoUrl || undefined,
           supportEmail: d.supportEmail || undefined,
           enabledModules: Array.isArray(d.enabledModules) ? d.enabledModules : [],
+          onboardingSlides: Array.isArray(d.mobileBranding?.onboardingSlides) ? d.mobileBranding.onboardingSlides : [],
         });
       }
     }).catch(() => {});
