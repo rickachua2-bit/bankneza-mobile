@@ -117,6 +117,8 @@ jobs:
           EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
         run: |
           npx expo prebuild --platform android --clean --no-install
+          mkdir -p android/app/src/main/assets/fonts
+          cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*.ttf android/app/src/main/assets/fonts/ 2>/dev/null || true
           sed -i 's/1\.9\.24/1.9.25/g' android/build.gradle android/gradle.properties 2>/dev/null || true
           sed -i "s/kotlin-gradle-plugin')/kotlin-gradle-plugin:1.9.25')/g" android/build.gradle
           sed -i 's/kotlin-gradle-plugin")/kotlin-gradle-plugin:1.9.25")/g' android/build.gradle

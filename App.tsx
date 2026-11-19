@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -101,7 +101,11 @@ function MainShell() {
           <PrimaryButton title="Unlock with Biometrics" onPress={unlockBiometrics} color={theme.accentColor} />
           <PrimaryButton
             title="Sign Out"
-            onPress={async () => { await clearToken(); setBiometricLocked(false); setCustomer(null); }}
+            onPress={async () => {
+              await clearToken();
+              setBiometricLocked(false);
+              setCustomer(null);
+            }}
             color="#475569"
           />
         </View>
@@ -120,12 +124,13 @@ function MainShell() {
   const bg = theme.isDark ? '#0B0F1A' : '#F3F6FB';
   const navBg = theme.isDark ? '#141B2D' : '#FFFFFF';
   const navBorder = theme.isDark ? '#1E293B' : '#E2E8F0';
+  const inactiveTint = theme.isDark ? '#94A3B8' : '#475569';
   const tabTitleMap: Record<TabKey, string> = {
     home: theme.brandName,
-    transfer: 'Send Money',
-    bills: 'Bills & Utilities',
+    transfer: 'Send & Withdraw Money',
+    bills: 'Bills & Utilities Hub',
     cards: 'Virtual & Physical Cards',
-    services: 'Global FX, Flights & More',
+    services: 'Global FX, Crypto & Flights',
     profile: 'Profile, KYC & Security',
   };
 
@@ -134,34 +139,85 @@ function MainShell() {
       <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       {tab !== 'home' && (
         <View style={[styles.subHeader, { backgroundColor: navBg, borderBottomColor: navBorder }]}>
-          <TouchableOpacity onPress={() => setTab('home')} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => setTab('home')} style={[styles.backBtn, { backgroundColor: theme.isDark ? '#1E293B' : '#F1F5F9' }]}>
             <Ionicons name="arrow-back" size={20} color={theme.isDark ? '#F8FAFC' : theme.primaryColor} />
           </TouchableOpacity>
-          <Text style={[styles.subHeaderTitle, { color: theme.isDark ? '#F8FAFC' : theme.primaryColor }]}>
-            {tabTitleMap[tab]}
-          </Text>
-          <View style={{ width: 32 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {theme.logoUrl ? <Image source={{ uri: theme.logoUrl }} style={styles.subLogo} /> : null}
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '900', color: theme.accentColor, letterSpacing: 0.7 }}>
+                {theme.brandName.toUpperCase()}
+              </Text>
+              <Text style={[styles.subHeaderTitle, { color: theme.isDark ? '#F8FAFC' : theme.primaryColor }]}>
+                {tabTitleMap[tab]}
+              </Text>
+            </View>
+          </View>
+          <View style={{ width: 36 }} />
         </View>
       )}
 
       <View style={{ flex: 1 }}>
         {tab === 'home' && <HomeScreen customer={customer} onNavigate={setTab} onRefresh={() => loadCustomer(true)} />}
-        {tab === 'transfer' && <TransferScreen customer={customer} onSuccess={() => { loadCustomer(true); setTab('home'); }} />}
-        {tab === 'bills' && <BillsScreen onSuccess={() => { loadCustomer(true); setTab('home'); }} />}
+        {tab === 'transfer' && (
+          <TransferScreen
+            customer={customer}
+            onSuccess={() => {
+              loadCustomer(true);
+              setTab('home');
+            }}
+          />
+        )}
+        {tab === 'bills' && (
+          <BillsScreen
+            onSuccess={() => {
+              loadCustomer(true);
+              setTab('home');
+            }}
+          />
+        )}
         {tab === 'cards' && <CardsScreen customer={customer} onRefresh={() => loadCustomer(true)} />}
-        {tab === 'services' && <ServicesScreen onSuccess={() => { loadCustomer(true); setTab('home'); }} />}
-        {tab === 'profile' && <ProfileSupportScreen customer={customer} onRefresh={() => loadCustomer(true)} onSignOut={() => setCustomer(null)} />}
+        {tab === 'services' && (
+          <ServicesScreen
+            onSuccess={() => {
+              loadCustomer(true);
+              setTab('home');
+            }}
+          />
+        )}
+        {tab === 'profile' && (
+          <ProfileSupportScreen customer={customer} onRefresh={() => loadCustomer(true)} onSignOut={() => setCustomer(null)} />
+        )}
       </View>
 
+      {/* BOLD, MODERN FOOTER BOTTOM NAVIGATION BAR */}
       <View style={[styles.bottomNav, { backgroundColor: navBg, borderTopColor: navBorder }]}>
         {tabs.map((t) => {
           const active = tab === t.key || (t.key === 'bills' && tab === 'services');
           return (
-            <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={styles.navItem}>
-              <View style={[styles.navPill, active && { backgroundColor: `${theme.accentColor}1E` }]}>
-                <Ionicons name={active ? t.icon : t.iconOutline} size={21} color={active ? theme.accentColor : '#64748B'} />
+            <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} activeOpacity={0.85} style={styles.navItem}>
+              <View
+                style={[
+                  styles.navPill,
+                  active && {
+                    backgroundColor: theme.accentColor,
+                    shadowColor: theme.accentColor,
+                    shadowOpacity: 0.35,
+                    shadowRadius: 6,
+                    elevation: 4,
+                  },
+                ]}
+              >
+                <Ionicons name={active ? t.icon : t.iconOutline} size={23} color={active ? '#FFFFFF' : inactiveTint} />
               </View>
-              <Text style={{ fontSize: 10.5, fontWeight: active ? '800' : '600', color: active ? theme.accentColor : '#64748B', marginTop: 2 }}>
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: active ? '900' : '700',
+                  color: active ? theme.accentColor : inactiveTint,
+                  marginTop: 4,
+                }}
+              >
                 {t.label}
               </Text>
             </TouchableOpacity>
@@ -185,10 +241,33 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F6FB' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F6FB' },
-  subHeader: { paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1 },
-  backBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  subHeaderTitle: { fontSize: 16, fontWeight: '800' },
-  bottomNav: { flexDirection: 'row', borderTopWidth: 1, paddingTop: 8, paddingBottom: 6, shadowColor: '#0f172a', shadowOpacity: 0.06, shadowRadius: 10, elevation: 8 },
-  navItem: { flex: 1, alignItems: 'center' },
-  navPill: { paddingHorizontal: 14, paddingVertical: 4, borderRadius: 999 },
+  subHeader: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+  },
+  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  subLogo: { width: 26, height: 26, borderRadius: 13 },
+  subHeaderTitle: { fontSize: 15, fontWeight: '900' },
+  bottomNav: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingTop: 8,
+    paddingBottom: 8,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 12,
+  },
+  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  navPill: {
+    width: 48,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

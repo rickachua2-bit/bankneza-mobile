@@ -1,8 +1,23 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, ViewStyle, TextInputProps } from 'react-native';
+import { useTenantTheme } from '../theme/ThemeProvider';
 
 export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  const theme = useTenantTheme();
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.isDark ? '#141B2D' : '#FFFFFF',
+          borderColor: theme.isDark ? '#1E293B' : '#E2E8F0',
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function PrimaryButton({
@@ -30,48 +45,54 @@ export function PrimaryButton({
 }
 
 export function Field({ label, ...props }: { label: string } & TextInputProps) {
+  const theme = useTenantTheme();
   return (
     <View style={{ marginBottom: 12 }}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput style={styles.input} placeholderTextColor="#94a3b8" {...props} />
+      <Text style={[styles.label, { color: theme.isDark ? '#CBD5E1' : '#475569' }]}>{label}</Text>
+      <TextInput
+        style={[
+          styles.input,
+          {
+            backgroundColor: theme.isDark ? '#1E293B' : '#F8FAFC',
+            borderColor: theme.isDark ? '#334155' : '#CBD5E1',
+            color: theme.isDark ? '#F8FAFC' : '#0F172A',
+          },
+        ]}
+        placeholderTextColor={theme.isDark ? '#64748B' : '#94A3B8'}
+        {...props}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   btn: {
-    borderRadius: 10,
-    paddingVertical: 13,
+    borderRadius: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
   btnText: {
     color: '#ffffff',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 14,
   },
   label: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
+    fontWeight: '800',
     marginBottom: 5,
   },
   input: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 11,
     fontSize: 14,
-    color: '#0f172a',
   },
 });
