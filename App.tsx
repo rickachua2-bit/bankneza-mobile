@@ -13,10 +13,11 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { TransferScreen } from './src/screens/TransferScreen';
 import { BillsScreen } from './src/screens/BillsScreen';
 import { CardsScreen } from './src/screens/CardsScreen';
+import { ServicesScreen } from './src/screens/ServicesScreen';
 import { ProfileSupportScreen } from './src/screens/ProfileSupportScreen';
 import { PrimaryButton } from './src/components/Ui';
 
-type TabKey = 'home' | 'transfer' | 'bills' | 'cards' | 'profile';
+type TabKey = 'home' | 'transfer' | 'bills' | 'cards' | 'services' | 'profile';
 
 function MainShell() {
   const theme = useTenantTheme();
@@ -106,11 +107,13 @@ function MainShell() {
     );
   }
 
+  const showServices = ['FLIGHTS', 'BETTING_VAS', 'FX', 'GLOBAL_PAYOUTS', 'CRYPTO'].some((k) => isFeatureEnabled(theme, k));
   const allTabs: Array<{ key: TabKey; label: string; icon: any; show: boolean }> = [
     { key: 'home', label: 'Home', icon: 'home', show: true },
     { key: 'transfer', label: 'Transfer', icon: 'send', show: isFeatureEnabled(theme, 'TRANSFERS') },
     { key: 'bills', label: 'Bills', icon: 'flash', show: isFeatureEnabled(theme, 'BILLS') },
     { key: 'cards', label: 'Cards', icon: 'card', show: isFeatureEnabled(theme, 'VIRTUAL_CARDS') || isFeatureEnabled(theme, 'PHYSICAL_CARDS') },
+    { key: 'services', label: 'Global', icon: 'globe', show: showServices },
     { key: 'profile', label: 'More', icon: 'person', show: true },
   ];
   const tabs = allTabs.filter((t) => t.show);
@@ -127,6 +130,7 @@ function MainShell() {
         {tab === 'transfer' && <TransferScreen customer={customer} onSuccess={() => { loadCustomer(true); setTab('home'); }} />}
         {tab === 'bills' && <BillsScreen onSuccess={() => { loadCustomer(true); setTab('home'); }} />}
         {tab === 'cards' && <CardsScreen customer={customer} onRefresh={() => loadCustomer(true)} />}
+        {tab === 'services' && <ServicesScreen onSuccess={() => { loadCustomer(true); setTab('home'); }} />}
         {tab === 'profile' && <ProfileSupportScreen customer={customer} onRefresh={() => loadCustomer(true)} onSignOut={() => setCustomer(null)} />}
       </View>
 

@@ -80,4 +80,14 @@ export const portalApi = {
   createSupportTicket: (body: { subject: string; category: string; message: string }) =>
     apiRequest('/api/portal/support/tickets', { method: 'POST', body }),
   getNotifications: () => apiRequest('/api/portal/notifications'),
+  searchFlights: (body: { origin: string; destination: string; departureDate: string; cabinClass: string }) =>
+    apiRequest('/api/portal/flights/search', { method: 'POST', body }),
+  fundBetting: (body: { operator: string; customerId: string; amount: number }) =>
+    apiRequest('/api/portal/betting/fund', { method: 'POST', body }),
+  fxSwap: (body: { sourceCurrency: string; targetCurrency: string; amount: number }) =>
+    apiRequest('/api/portal/fx/swap', { method: 'POST', body }),
+  sendRemittance: (body: { type: string; currency: string; beneficiaryName: string; accountNumber: string; amount: number }) =>
+    apiRequest('/api/portal/remittance/send', { method: 'POST', body }),
+  generateCryptoAddress: (body: { currency: string }) =>
+    apiRequest('/api/portal/crypto/address', { method: 'POST', body }),
 };
