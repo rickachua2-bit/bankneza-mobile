@@ -14,7 +14,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     name: appName,
-    slug: `bankneza-${tenantSlug}`,
+    owner: process.env.EXPO_OWNER || 'pickpadi-global-ltd',
+    slug: process.env.EXPO_PROJECT_SLUG || 'rickwealth',
     version: versionName,
     orientation: 'portrait',
     userInterfaceStyle: 'light',
