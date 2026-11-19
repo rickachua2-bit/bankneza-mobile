@@ -118,6 +118,8 @@ jobs:
         run: |
           npx expo prebuild --platform android --clean --no-install
           sed -i 's/1\.9\.24/1.9.25/g' android/build.gradle android/gradle.properties 2>/dev/null || true
+          sed -i "s/kotlin-gradle-plugin')/kotlin-gradle-plugin:1.9.25')/g" android/build.gradle
+          sed -i 's/kotlin-gradle-plugin")/kotlin-gradle-plugin:1.9.25")/g' android/build.gradle
           echo "android.kotlinVersion=1.9.25" >> android/gradle.properties
           cd android
           chmod +x gradlew
