@@ -47,6 +47,7 @@ export function HomeScreen({
   const [rcNumber, setRcNumber] = useState('');
   const [kycLoading, setKycLoading] = useState(false);
   const [selectedCurr, setSelectedCurr] = useState<'NGN' | 'USD' | 'GBP' | 'EUR' | 'USDT'>('NGN');
+  const [txFilter, setTxFilter] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL');
 
   const fmt = (n: number) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
   const txs = Array.isArray(customer?.transactions) ? customer.transactions : [];
@@ -579,23 +580,52 @@ export function HomeScreen({
 
       {/* RECENT TRANSACTIONS */}
       <View style={[styles.sectionCard, { backgroundColor: cardBg, borderColor: borderCol }]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <Text style={[styles.sectionTitle, { color: titleColor }]}>Recent Activity</Text>
           <TouchableOpacity onPress={handlePullRefresh}>
             <Text style={{ color: theme.accentColor, fontWeight: '800', fontSize: 12.5 }}>↻ Refresh</Text>
           </TouchableOpacity>
         </View>
-        {txs.length === 0 ? (
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          {[
+            { key: 'ALL' as const, label: 'All Activity' },
+            { key: 'CREDIT' as const, label: 'Money In (+)' },
+            { key: 'DEBIT' as const, label: 'Money Out (-)' },
+          ].map((f) => (
+            <TouchableOpacity
+              key={f.key}
+              onPress={() => setTxFilter(f.key)}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 999,
+                backgroundColor: txFilter === f.key ? theme.primaryColor : isDark ? '#1E293B' : '#F1F5F9',
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '800', color: txFilter === f.key ? '#fff' : titleColor }}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {txs.filter((tx: any) =>
+          txFilter === 'ALL' ? true : txFilter === 'CREDIT' ? Number(tx.amountNgn || 0) >= 0 : Number(tx.amountNgn || 0) < 0
+        ).length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 22 }}>
             <Ionicons name="receipt-outline" size={32} color={mutedColor} />
             <Text style={{ color: mutedColor, fontSize: 13, marginTop: 8, textAlign: 'center' }}>
               {isKycVerified
-                ? 'No transactions yet. Tap Receive above to fund your NGN, USD, GBP, EUR, or USDT account.'
+                ? 'No transactions found for this filter.'
                 : 'Complete KYC verification above to unlock your multi-currency bank accounts.'}
             </Text>
           </View>
         ) : (
-          txs.slice(0, 12).map((tx: any) => {
+          txs
+            .filter((tx: any) =>
+              txFilter === 'ALL' ? true : txFilter === 'CREDIT' ? Number(tx.amountNgn || 0) >= 0 : Number(tx.amountNgn || 0) < 0
+            )
+            .slice(0, 15)
+            .map((tx: any) => {
             const isCredit = Number(tx.amountNgn || 0) >= 0;
             return (
               <TouchableOpacity

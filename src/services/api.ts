@@ -50,6 +50,10 @@ export const portalApi = {
     apiRequest('/api/portal/verify-email', { method: 'POST', body, auth: false }),
   resendOtp: (email: string) =>
     apiRequest('/api/portal/resend-otp', { method: 'POST', body: { email }, auth: false }),
+  forgotPassword: (email: string) =>
+    apiRequest('/api/portal/forgot-password', { method: 'POST', body: { email }, auth: false }),
+  resetPassword: (body: { email: string; code: string; newPassword: string }) =>
+    apiRequest('/api/portal/reset-password', { method: 'POST', body, auth: false }),
   getNotifications: () => apiRequest('/api/portal/notifications'),
   getMe: () => apiRequest('/api/portal/me'),
   getBanks: () => apiRequest('/api/portal/banks'),
@@ -64,6 +68,13 @@ export const portalApi = {
     narration: string;
     totpCode?: string;
   }) => apiRequest('/api/portal/transfer', { method: 'POST', body }),
+  resolveP2p: (identifier: string) =>
+    apiRequest('/api/portal/p2p/resolve', { method: 'POST', body: { identifier } }),
+  sendP2pTransfer: (body: { identifier: string; amount: number; narration?: string; totpCode?: string }) =>
+    apiRequest('/api/portal/p2p/transfer', { method: 'POST', body }),
+  getBeneficiaries: () => apiRequest('/api/portal/beneficiaries'),
+  saveBeneficiary: (body: { bankCode: string; bankName: string; accountNumber: string; accountName: string }) =>
+    apiRequest('/api/portal/beneficiaries', { method: 'POST', body }),
   getBillsData: () => apiRequest('/api/portal/bills/data'),
   getDataPlans: (operator: string) =>
     apiRequest(`/api/portal/bills/data-plans?operator=${encodeURIComponent(operator)}`),
@@ -75,6 +86,8 @@ export const portalApi = {
     apiRequest('/api/portal/cards/virtual', { method: 'POST', body }),
   toggleVirtualCard: (id: string, status: 'ACTIVE' | 'FROZEN') =>
     apiRequest(`/api/portal/cards/virtual/${id}/status`, { method: 'PATCH', body: { status } }),
+  fundVirtualCard: (id: string, amount: number) =>
+    apiRequest(`/api/portal/cards/virtual/${id}/fund`, { method: 'POST', body: { amount } }),
   orderPhysicalCard: (body: { cardScheme: string; deliveryAddress: string; phone: string }) =>
     apiRequest('/api/portal/cards/physical-order', { method: 'POST', body }),
   upgradeKyc: (bvn: string) =>
@@ -91,12 +104,24 @@ export const portalApi = {
     apiRequest('/api/portal/support/tickets', { method: 'POST', body }),
   searchFlights: (body: { origin: string; destination: string; departureDate: string; cabinClass: string }) =>
     apiRequest('/api/portal/flights/search', { method: 'POST', body }),
+  bookFlight: (body: {
+    offerId?: string;
+    origin: string;
+    destination: string;
+    departureDate: string;
+    airline: string;
+    amountNgn: number;
+    passengerName?: string;
+    passengerEmail?: string;
+  }) => apiRequest('/api/portal/flights/book', { method: 'POST', body }),
   fundBetting: (body: { operator: string; customerId: string; amount: number }) =>
     apiRequest('/api/portal/betting/fund', { method: 'POST', body }),
+  getFxRates: () => apiRequest('/api/portal/fx/rates'),
   fxSwap: (body: { sourceCurrency: string; targetCurrency: string; amount: number }) =>
     apiRequest('/api/portal/fx/swap', { method: 'POST', body }),
   sendRemittance: (body: { type: string; currency: string; beneficiaryName: string; accountNumber: string; amount: number }) =>
     apiRequest('/api/portal/remittance/send', { method: 'POST', body }),
+  getCryptoDesk: () => apiRequest('/api/portal/crypto/desk'),
   generateCryptoAddress: (body: { currency: string }) =>
     apiRequest('/api/portal/crypto/address', { method: 'POST', body }),
 };
