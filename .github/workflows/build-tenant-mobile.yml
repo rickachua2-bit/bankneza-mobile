@@ -49,6 +49,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -56,13 +57,20 @@ jobs:
         with:
           node-version: 22
 
+      - uses: actions/setup-java@v4
+        if: inputs.platform == 'ANDROID_APK' || inputs.platform == 'ANDROID_AAB'
+        with:
+          distribution: temurin
+          java-version: 17
+
       - uses: expo/expo-github-action@v8
+        if: inputs.platform != 'ANDROID_APK' && inputs.platform != 'ANDROID_AAB'
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Prepare Branded Icon & Splash
         env:
@@ -74,8 +82,9 @@ jobs:
             cp assets/icon.png assets/splash.png 2>/dev/null || true
           fi
 
-      - name: Run EAS Cloud Build
-        id: eas
+      - name: Build Android APK / AAB Directly (Zero Queue)
+        id: android_local
+        if: inputs.platform == 'ANDROID_APK' || inputs.platform == 'ANDROID_AAB'
         env:
           TENANT_SLUG: ${{ inputs.tenantSlug }}
           APP_NAME: ${{ inputs.appName }}
@@ -88,11 +97,45 @@ jobs:
           API_BASE_URL: ${{ inputs.apiBaseUrl }}
           EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
         run: |
-          if [ "${{ inputs.platform }}" = "ANDROID_APK" ]; then
-            OUT=$(eas build --platform android --profile preview-apk --non-interactive --json)
-          elif [ "${{ inputs.platform }}" = "ANDROID_AAB" ]; then
-            OUT=$(eas build --platform android --profile production --non-interactive --json)
-          elif [ "${{ inputs.platform }}" = "IOS_IPA" ]; then
+          npx expo prebuild --platform android --clean --no-install
+          cd android
+          chmod +x gradlew
+          if [ "${{ inputs.platform }}" = "ANDROID_AAB" ]; then
+            ./gradlew bundleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+            ARTIFACT_FILE=$(find app/build/outputs/bundle/release -name "*.aab" | head -n 1)
+            EXT="aab"
+          else
+            ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+            ARTIFACT_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+            EXT="apk"
+          fi
+          echo "Built artifact: $ARTIFACT_FILE"
+          UPLOAD_URL="${{ inputs.callbackUrl }}"
+          UPLOAD_URL="${UPLOAD_URL%/callback}/upload-artifact?ext=${EXT}"
+          RESP=$(curl -fsSL -X POST "$UPLOAD_URL" \
+            -H "Content-Type: application/octet-stream" \
+            -H "X-Build-Secret: ${{ secrets.MOBILE_BUILD_CALLBACK_SECRET }}" \
+            --data-binary "@$ARTIFACT_FILE")
+          echo "Upload response: $RESP"
+          ARTIFACT_URL=$(echo "$RESP" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d?.data?.artifactUrl || '');")
+          echo "artifact_url=$ARTIFACT_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Run EAS Cloud Build (iOS / Combined)
+        id: eas
+        if: inputs.platform != 'ANDROID_APK' && inputs.platform != 'ANDROID_AAB'
+        env:
+          TENANT_SLUG: ${{ inputs.tenantSlug }}
+          APP_NAME: ${{ inputs.appName }}
+          ANDROID_PACKAGE: ${{ inputs.androidPackageId }}
+          IOS_BUNDLE_ID: ${{ inputs.iosBundleId }}
+          VERSION_NAME: ${{ inputs.versionName }}
+          BUILD_NUMBER: ${{ inputs.buildNumber }}
+          PRIMARY_COLOR: ${{ inputs.primaryColor }}
+          ACCENT_COLOR: ${{ inputs.accentColor }}
+          API_BASE_URL: ${{ inputs.apiBaseUrl }}
+          EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
+        run: |
+          if [ "${{ inputs.platform }}" = "IOS_IPA" ]; then
             OUT=$(eas build --platform ios --profile production --non-interactive --json)
           else
             OUT=$(eas build --platform all --profile production --non-interactive --json)
@@ -103,11 +146,12 @@ jobs:
       - name: Notify Bankneza Mobile Factory
         if: always()
         run: |
+          ARTIFACT_URL="${{ steps.android_local.outputs.artifact_url || steps.eas.outputs.artifact_url }}"
           STATUS="COMPLETED"
-          if [ "${{ job.status }}" != "success" ] || [ -z "${{ steps.eas.outputs.artifact_url }}" ]; then
+          if [ "${{ job.status }}" != "success" ] || [ -z "$ARTIFACT_URL" ]; then
             STATUS="FAILED"
           fi
           curl -s -X POST "${{ inputs.callbackUrl }}" \
             -H "Content-Type: application/json" \
             -H "X-Build-Secret: ${{ secrets.MOBILE_BUILD_CALLBACK_SECRET }}" \
-            -d "{\"status\":\"$STATUS\",\"artifactUrl\":\"${{ steps.eas.outputs.artifact_url }}\"}"
+            -d "{\"status\":\"$STATUS\",\"artifactUrl\":\"$ARTIFACT_URL\"}"
