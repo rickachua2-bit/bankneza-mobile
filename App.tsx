@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Ionicons } from '@expo/vector-icons';
-import { ThemeProvider, useTenantTheme } from './src/theme/ThemeProvider';
+import { isFeatureEnabled, ThemeProvider, useTenantTheme } from './src/theme/ThemeProvider';
 import { clearToken, getToken, portalApi } from './src/services/api';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -106,13 +106,14 @@ function MainShell() {
     );
   }
 
-  const tabs: Array<{ key: TabKey; label: string; icon: any }> = [
-    { key: 'home', label: 'Home', icon: 'home' },
-    { key: 'transfer', label: 'Transfer', icon: 'send' },
-    { key: 'bills', label: 'Bills', icon: 'flash' },
-    { key: 'cards', label: 'Cards', icon: 'card' },
-    { key: 'profile', label: 'More', icon: 'person' },
+  const allTabs: Array<{ key: TabKey; label: string; icon: any; show: boolean }> = [
+    { key: 'home', label: 'Home', icon: 'home', show: true },
+    { key: 'transfer', label: 'Transfer', icon: 'send', show: isFeatureEnabled(theme, 'TRANSFERS') },
+    { key: 'bills', label: 'Bills', icon: 'flash', show: isFeatureEnabled(theme, 'BILLS') },
+    { key: 'cards', label: 'Cards', icon: 'card', show: isFeatureEnabled(theme, 'VIRTUAL_CARDS') || isFeatureEnabled(theme, 'PHYSICAL_CARDS') },
+    { key: 'profile', label: 'More', icon: 'person', show: true },
   ];
+  const tabs = allTabs.filter((t) => t.show);
 
   return (
     <SafeAreaView style={styles.safe}>

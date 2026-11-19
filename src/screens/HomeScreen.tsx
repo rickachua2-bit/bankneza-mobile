@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Modal, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
-import { useTenantTheme } from '../theme/ThemeProvider';
+import { isFeatureEnabled, useTenantTheme } from '../theme/ThemeProvider';
 import { Card, PrimaryButton } from '../components/Ui';
 
 export function HomeScreen({
@@ -63,11 +63,11 @@ export function HomeScreen({
 
       <View style={styles.actionsRow}>
         {[
-          { key: 'transfer', label: 'Send', icon: 'send' },
-          { key: 'bills', label: 'Bills', icon: 'flash' },
-          { key: 'cards', label: 'Cards', icon: 'card' },
-          { key: 'profile', label: 'KYC & 2FA', icon: 'shield-checkmark' },
-        ].map((a) => (
+          { key: 'transfer', label: 'Send', icon: 'send', show: isFeatureEnabled(theme, 'TRANSFERS') },
+          { key: 'bills', label: 'Bills', icon: 'flash', show: isFeatureEnabled(theme, 'BILLS') },
+          { key: 'cards', label: 'Cards', icon: 'card', show: isFeatureEnabled(theme, 'VIRTUAL_CARDS') || isFeatureEnabled(theme, 'PHYSICAL_CARDS') },
+          { key: 'profile', label: 'KYC & 2FA', icon: 'shield-checkmark', show: true },
+        ].filter((a) => a.show).map((a) => (
           <TouchableOpacity key={a.key} onPress={() => onNavigate(a.key as any)} style={styles.actionBtn}>
             <Ionicons name={a.icon as any} size={20} color={theme.accentColor} style={{ marginBottom: 4 }} />
             <Text style={[styles.actionTxt, { color: theme.primaryColor }]}>{a.label}</Text>
