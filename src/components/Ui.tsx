@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View, ViewStyle, TextInputProps } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, ViewStyle, TextInputProps } from 'react-native';
 
 export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
   return <View style={[styles.card, style]}>{children}</View>;
@@ -10,19 +10,21 @@ export function PrimaryButton({
   onPress,
   color = '#0066FF',
   disabled,
+  loading,
 }: {
   title: string;
   onPress: () => void;
   color?: string;
   disabled?: boolean;
+  loading?: boolean;
 }) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      disabled={disabled}
-      style={[styles.btn, { backgroundColor: color, opacity: disabled ? 0.6 : 1 }]}
+      disabled={disabled || loading}
+      style={[styles.btn, { backgroundColor: color, opacity: disabled || loading ? 0.65 : 1 }]}
     >
-      <Text style={styles.btnText}>{title}</Text>
+      {loading ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.btnText}>{title}</Text>}
     </TouchableOpacity>
   );
 }
