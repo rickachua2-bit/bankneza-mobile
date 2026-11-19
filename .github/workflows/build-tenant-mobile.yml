@@ -64,12 +64,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
 
       - uses: actions/setup-java@v4
         if: inputs.platform == 'ANDROID_APK' || inputs.platform == 'ANDROID_AAB'
         with:
           distribution: temurin
           java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: inputs.platform == 'ANDROID_APK' || inputs.platform == 'ANDROID_AAB'
+        with:
+          cache-read-only: false
 
       - uses: expo/expo-github-action@v8
         if: inputs.platform != 'ANDROID_APK' && inputs.platform != 'ANDROID_AAB'
@@ -118,7 +124,7 @@ jobs:
             ARTIFACT_FILE=$(find app/build/outputs/bundle/release -name "*.aab" | head -n 1)
             EXT="aab"
           else
-            ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+            ./gradlew assembleRelease --no-daemon --parallel --build-cache -PreactNativeArchitectures=arm64-v8a
             ARTIFACT_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
             EXT="apk"
           fi
