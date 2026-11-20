@@ -31,6 +31,8 @@ export function ProfileSupportScreen({
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [tickets, setTickets] = useState<any[]>([]);
+  const [activeChatTicket, setActiveChatTicket] = useState<any>(null);
+  const [chatInput, setChatInput] = useState('');
   const [curPass, setCurPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [loading, setLoading] = useState(false);
@@ -400,17 +402,119 @@ export function ProfileSupportScreen({
         </View>
       </Modal>
 
-      {/* SUPPORT MODAL */}
-      <Modal visible={activeModal === 'support'} transparent animationType="slide" onRequestClose={() => setActiveModal(null)}>
+      {/* SUPPORT & LIVE CHAT MODAL */}
+      <Modal visible={activeModal === 'support'} transparent animationType="slide" onRequestClose={() => { setActiveChatTicket(null); setActiveModal(null); }}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <View style={styles.modalHdr}>
-              <Text style={[styles.modalTitle, { color: titleColor }]}>Help &amp; Support</Text>
-              <TouchableOpacity onPress={() => setActiveModal(null)}><Ionicons name="close-circle" size={24} color={mutedColor} /></TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: titleColor }]}>
+                {activeChatTicket ? `Chat: ${activeChatTicket.subject}` : 'Help, Support & Live Chat'}
+              </Text>
+              <TouchableOpacity onPress={() => { if (activeChatTicket) setActiveChatTicket(null); else setActiveModal(null); }}>
+                <Ionicons name={activeChatTicket ? 'arrow-back-circle' : 'close-circle'} size={25} color={mutedColor} />
+              </TouchableOpacity>
             </View>
-            <Field label="Subject" value={subject} onChangeText={setSubject} placeholder="e.g. Transfer inquiry" />
-            <Field label="Message" value={message} onChangeText={setMessage} placeholder="Describe how we can help..." multiline />
-            <PrimaryButton title="Send Support Ticket →" onPress={handleTicket} loading={loading} color={theme.accentColor} />
+
+            <TouchableOpacity
+              onPress={() => copyText('Support Email', theme.supportEmail || 'support@bankneza.com')}
+              style={[styles.accBox, { borderColor: borderCol, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+            >
+              <View>
+                <Text style={{ fontSize: 10.5, fontWeight: '800', color: mutedColor }}>DIRECT SUPPORT EMAIL</Text>
+                <Text style={{ fontSize: 13.5, fontWeight: '900', color: theme.accentColor, marginTop: 2 }}>
+                  {theme.supportEmail || 'support@bankneza.com'}
+                </Text>
+              </View>
+              <Ionicons name="copy" size={18} color={theme.accentColor} />
+            </TouchableOpacity>
+
+            {activeChatTicket ? (
+              <View>
+                <ScrollView style={{ maxHeight: 240, marginBottom: 12 }}>
+                  {(Array.isArray(activeChatTicket.chatMessages) && activeChatTicket.chatMessages.length > 0
+                    ? activeChatTicket.chatMessages
+                    : [{ senderName: customer?.fullName || 'You', senderRole: 'CUSTOMER', text: activeChatTicket.message, createdAt: activeChatTicket.createdAt }]
+                  ).map((m: any, idx: number) => {
+                    const isCustomer = m.senderRole === 'CUSTOMER';
+                    return (
+                      <View
+                        key={idx}
+                        style={{
+                          alignSelf: isCustomer ? 'flex-end' : 'flex-start',
+                          maxWidth: '82%',
+                          backgroundColor: isCustomer ? `${theme.accentColor}1E` : isDark ? '#1E293B' : '#F1F5F9',
+                          padding: 10,
+                          borderRadius: 12,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: isCustomer ? theme.accentColor : titleColor }}>
+                          {isCustomer ? 'You' : m.senderName || `${theme.brandName} Support`}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: titleColor, marginTop: 2 }}>{m.text}</Text>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+                <Field label="Reply Message" value={chatInput} onChangeText={setChatInput} placeholder="Type your message to support..." />
+                <PrimaryButton
+                  title="Send Chat Message →"
+                  loading={loading}
+                  color={theme.accentColor}
+                  onPress={async () => {
+                    if (!chatInput.trim()) return;
+                    setLoading(true);
+                    try {
+                      const res = await portalApi.sendSupportChat(activeChatTicket.id, chatInput.trim());
+                      if (res.success) {
+                        setChatInput('');
+                        setActiveChatTicket(res.data);
+                        const r = await portalApi.getSupportTickets();
+                        if (r.success && Array.isArray(r.data)) setTickets(r.data);
+                      } else {
+                        Alert.alert('Error', res.error?.message || 'Could not send message.');
+                      }
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                />
+              </View>
+            ) : (
+              <ScrollView style={{ maxHeight: 360 }}>
+                <Field label="Subject" value={subject} onChangeText={setSubject} placeholder="e.g. Transfer or card inquiry" />
+                <Field label="Message" value={message} onChangeText={setMessage} placeholder="Describe how we can help..." multiline />
+                <PrimaryButton title="Open New Support Ticket →" onPress={handleTicket} loading={loading} color={theme.accentColor} />
+
+                {tickets.length > 0 && (
+                  <View style={{ marginTop: 14 }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: titleColor, marginBottom: 8 }}>
+                      My Support Tickets (Tap to Chat)
+                    </Text>
+                    {tickets.map((t) => (
+                      <TouchableOpacity
+                        key={t.id}
+                        onPress={() => setActiveChatTicket(t)}
+                        style={[styles.accBox, { borderColor: borderCol }]}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontWeight: '800', fontSize: 13, color: titleColor }}>{t.subject}</Text>
+                          <Text style={{ fontSize: 10.5, fontWeight: '900', color: t.status === 'RESOLVED' ? '#15803D' : '#D97706' }}>
+                            {t.status}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 12, color: mutedColor, marginTop: 3 }} numberOfLines={2}>
+                          {t.adminReply ? `Support: ${t.adminReply}` : t.message}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: theme.accentColor, marginTop: 4 }}>
+                          Open Live Chat ({Array.isArray(t.chatMessages) ? t.chatMessages.length : 1}) →
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>

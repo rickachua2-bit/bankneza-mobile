@@ -131,6 +131,8 @@ export const portalApi = {
   getSupportTickets: () => apiRequest('/api/portal/support/tickets'),
   createSupportTicket: (body: { subject: string; category: string; message: string }) =>
     apiRequest('/api/portal/support/tickets', { method: 'POST', body }),
+  sendSupportChat: (ticketId: string, text: string) =>
+    apiRequest(`/api/portal/support/tickets/${ticketId}/chat`, { method: 'POST', body: { text } }),
   searchFlights: (body: { origin: string; destination: string; departureDate: string; cabinClass: string }) =>
     apiRequest('/api/portal/flights/search', { method: 'POST', body }),
   bookFlight: (body: {
