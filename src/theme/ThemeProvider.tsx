@@ -13,10 +13,13 @@ export interface OnboardingSlide {
 
 export interface TenantTheme {
   brandName: string;
+  tagline: string;
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
   logoUrl?: string;
+  splashImageUrl?: string;
+  splashBgColor: string;
   supportEmail?: string;
   enabledModules: string[];
   onboardingSlides: OnboardingSlide[];
@@ -29,9 +32,11 @@ const extra = (Constants.expoConfig?.extra || {}) as Record<string, string>;
 
 const defaultTheme: TenantTheme = {
   brandName: Constants.expoConfig?.name || 'Digital Bank',
+  tagline: 'Multi-Currency Digital Banking & Payments',
   primaryColor: extra.primaryColor || '#001C71',
   secondaryColor: '#000F3D',
   accentColor: extra.accentColor || '#0066FF',
+  splashBgColor: extra.primaryColor || '#001C71',
   enabledModules: [],
   onboardingSlides: [],
   appTemplate: 'OPAY',
@@ -58,12 +63,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const appTemplate: AppTemplateKey = (['OPAY', 'KUDA', 'REVOLUT', 'MONIEPOINT', 'GREY', 'CARDTONIC'].includes(rawTpl)
           ? rawTpl
           : 'OPAY') as AppTemplateKey;
+        const primary = d.theme?.primaryColor || d.primaryColor || defaultTheme.primaryColor;
         setTheme({
           brandName: d.brandName || defaultTheme.brandName,
-          primaryColor: d.theme?.primaryColor || d.primaryColor || defaultTheme.primaryColor,
+          tagline: d.tagline || defaultTheme.tagline,
+          primaryColor: primary,
           secondaryColor: d.theme?.secondaryColor || d.secondaryColor || defaultTheme.secondaryColor,
           accentColor: d.theme?.accentColor || d.accentColor || defaultTheme.accentColor,
-          logoUrl: d.logoUrl || d.mobileBranding?.appIconUrl || undefined,
+          logoUrl: d.mobileBranding?.appIconUrl || d.logoUrl || undefined,
+          splashImageUrl: d.mobileBranding?.splashImageUrl || d.mobileBranding?.appIconUrl || d.logoUrl || undefined,
+          splashBgColor: d.mobileBranding?.splashBgColor || primary,
           supportEmail: d.support?.email || d.supportEmail || undefined,
           enabledModules: Array.isArray(d.enabledModules) ? d.enabledModules : [],
           onboardingSlides: Array.isArray(d.mobileBranding?.onboardingSlides) ? d.mobileBranding.onboardingSlides : [],

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useFonts } from 'expo-font';
+import * as Font from 'expo-font';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,79 +19,134 @@ import { ProfileSupportScreen } from './src/screens/ProfileSupportScreen';
 import { PrimaryButton } from './src/components/Ui';
 
 type TabKey = 'home' | 'transfer' | 'bills' | 'cards' | 'services' | 'profile';
+const ONBOARDING_KEY = 'bankneza_seen_onboarding_v3';
 
 function MainShell() {
-  const [fontsLoaded] = useFonts(Ionicons.font);
   const theme = useTenantTheme();
+  const [showSplash, setShowSplash] = useState(true);
   const [booting, setBooting] = useState(true);
-  const [seenOnboarding, setSeenOnboarding] = useState(true);
+  const [seenOnboarding, setSeenOnboarding] = useState(false);
   const [biometricLocked, setBiometricLocked] = useState(false);
   const [customer, setCustomer] = useState<any>(null);
   const [tab, setTab] = useState<TabKey>('home');
 
   const loadCustomer = async (skipBiometric = false) => {
-    const onb = await SecureStore.getItemAsync('bankneza_seen_onboarding');
-    setSeenOnboarding(Boolean(onb));
+    try {
+      const onb = await SecureStore.getItemAsync(ONBOARDING_KEY).catch(() => null);
+      setSeenOnboarding(Boolean(onb));
 
-    const tok = await getToken();
-    if (!tok) {
-      setCustomer(null);
-      setBooting(false);
-      return;
-    }
-
-    if (!skipBiometric) {
-      const hasBio = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = hasBio ? await LocalAuthentication.isEnrolledAsync() : false;
-      if (enrolled) {
-        setBiometricLocked(true);
+      const tok = await getToken();
+      if (!tok) {
+        setCustomer(null);
+        return;
       }
-    }
 
-    const res = await portalApi.getMe().catch(() => ({ success: false, data: null }));
-    setCustomer(res.success ? res.data : null);
-    setBooting(false);
+      if (!skipBiometric) {
+        try {
+          const hasBio = await LocalAuthentication.hasHardwareAsync();
+          const enrolled = hasBio ? await LocalAuthentication.isEnrolledAsync() : false;
+          if (enrolled) {
+            setBiometricLocked(true);
+          }
+        } catch {}
+      }
+
+      const res = await portalApi.getMe().catch(() => ({ success: false, data: null }));
+      if (res.success && res.data) {
+        setCustomer(res.data);
+      } else {
+        setCustomer(null);
+      }
+    } catch {
+      setCustomer(null);
+    } finally {
+      setBooting(false);
+    }
   };
 
   useEffect(() => {
+    // Load vector icon font non-blockingly (native Android APK also has Ionicons.ttf in assets/fonts/)
+    Font.loadAsync(Ionicons.font).catch(() => {});
+
+    // Show branded splash screen for 1.8s and enforce a hard 2.4s boot safety timer so app can NEVER hang
+    const splashTimer = setTimeout(() => setShowSplash(false), 1800);
+    const safetyTimer = setTimeout(() => {
+      setBooting(false);
+      setShowSplash(false);
+    }, 2400);
+
     loadCustomer();
+
+    return () => {
+      clearTimeout(splashTimer);
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   const unlockBiometrics = async () => {
-    const res = await LocalAuthentication.authenticateAsync({ promptMessage: `Unlock ${theme.brandName}` });
-    if (res.success) setBiometricLocked(false);
+    try {
+      const res = await LocalAuthentication.authenticateAsync({ promptMessage: `Unlock ${theme.brandName}` });
+      if (res.success) setBiometricLocked(false);
+    } catch {
+      setBiometricLocked(false);
+    }
   };
 
-  if (booting || !fontsLoaded) {
+  // 1. FULL-SCREEN BRANDED SPLASH SCREEN ON LAUNCH
+  if (showSplash || booting) {
+    const splashImg = theme.splashImageUrl || theme.logoUrl;
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={theme.accentColor} />
+      <View style={[styles.splashContainer, { backgroundColor: theme.splashBgColor || theme.primaryColor }]}>
+        <StatusBar style="light" />
+        <View style={styles.splashCenter}>
+          {splashImg ? (
+            <Image source={{ uri: splashImg }} style={styles.splashLogoImg} resizeMode="contain" />
+          ) : (
+            <View style={[styles.splashIconCircle, { backgroundColor: theme.accentColor }]}>
+              <Ionicons name="wallet" size={50} color="#ffffff" />
+            </View>
+          )}
+          <Text style={styles.splashBrand}>{theme.brandName}</Text>
+          <Text style={styles.splashTagline}>{theme.tagline}</Text>
+          <ActivityIndicator size="large" color="#ffffff" style={{ marginTop: 28 }} />
+        </View>
+        <View style={styles.splashFooter}>
+          <Ionicons name="shield-checkmark" size={15} color="rgba(255,255,255,0.85)" />
+          <Text style={styles.splashFooterTxt}>256-Bit Encrypted Digital Banking Engine</Text>
+        </View>
       </View>
     );
   }
 
+  // 2. BRANDED 3-SLIDE ONBOARDING SCREEN
   if (!seenOnboarding && !customer) {
     return (
       <OnboardingScreen
         onDone={async () => {
-          await SecureStore.setItemAsync('bankneza_seen_onboarding', '1');
+          try {
+            await SecureStore.setItemAsync(ONBOARDING_KEY, '1');
+          } catch {}
           setSeenOnboarding(true);
         }}
       />
     );
   }
 
+  // 3. AUTHENTICATION SCREEN (LOGIN / REGISTER / EMAIL OTP / FORGOT PASSWORD)
   if (!customer) {
     return (
       <SafeAreaView style={styles.safe}>
+        <StatusBar style={theme.isDark ? 'light' : 'dark'} />
         <AuthScreen onAuthenticated={() => loadCustomer(true)} />
       </SafeAreaView>
     );
   }
 
+  // 4. BIOMETRIC LOCK SCREEN
   if (biometricLocked) {
     return (
       <View style={[styles.center, { padding: 24, backgroundColor: theme.primaryColor }]}>
+        <StatusBar style="light" />
         <Ionicons name="finger-print" size={64} color="#ffffff" style={{ marginBottom: 16 }} />
         <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 8 }}>{theme.brandName}</Text>
         <Text style={{ color: 'rgba(255,255,255,0.8)', marginBottom: 24, textAlign: 'center' }}>
@@ -99,6 +154,11 @@ function MainShell() {
         </Text>
         <View style={{ width: '100%', gap: 10 }}>
           <PrimaryButton title="Unlock with Biometrics" onPress={unlockBiometrics} color={theme.accentColor} />
+          <PrimaryButton
+            title="Skip & Continue to Wallet"
+            onPress={() => setBiometricLocked(false)}
+            color="rgba(255,255,255,0.22)"
+          />
           <PrimaryButton
             title="Sign Out"
             onPress={async () => {
@@ -241,6 +301,57 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F6FB' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F6FB' },
+  splashContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 54,
+    paddingHorizontal: 28,
+  },
+  splashCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashLogoImg: {
+    width: 112,
+    height: 112,
+    borderRadius: 28,
+    marginBottom: 20,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  splashIconCircle: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  splashBrand: {
+    color: '#ffffff',
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  splashTagline: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  splashFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  splashFooterTxt: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   subHeader: {
     paddingHorizontal: 14,
     paddingVertical: 11,

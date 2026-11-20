@@ -7,20 +7,28 @@ const TENANT_SLUG = extra.tenantSlug || 'fin';
 const TOKEN_KEY = `bankneza_portal_jwt_${TENANT_SLUG}`;
 
 export async function getToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY);
+  try {
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export async function setToken(token: string): Promise<void> {
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  try {
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+  } catch {}
 }
 
 export async function clearToken(): Promise<void> {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  try {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  } catch {}
 }
 
 export async function apiRequest<T = any>(
   path: string,
-  options: { method?: string; body?: unknown; auth?: boolean } = {}
+  options: { method?: string; body?: unknown; auth?: boolean; timeoutMs?: number } = {}
 ): Promise<{ success: boolean; data?: T; error?: { code?: string; message?: string; requires2fa?: boolean } }> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -32,16 +40,37 @@ export async function apiRequest<T = any>(
   }
   const sep = path.includes('?') ? '&' : '?';
   const url = `${BASE_URL}${path}${sep}tenant=${encodeURIComponent(TENANT_SLUG)}`;
-  const res = await fetch(url, {
-    method: options.method || 'GET',
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
-  return res.json();
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs || 12000);
+  try {
+    const res = await fetch(url, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { success: false, error: { code: 'INVALID_RESPONSE', message: 'Server returned an unexpected response.' } };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err?.name === 'AbortError' ? 'Request timed out. Check your internet connection.' : err?.message || 'Network request failed.',
+      },
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const portalApi = {
-  getTenantConfig: () => apiRequest('/api/public/tenant-config', { auth: false }),
+  getTenantConfig: () => apiRequest('/api/public/tenant-config', { auth: false, timeoutMs: 7000 }),
   login: (body: { email: string; password: string; totpCode?: string }) =>
     apiRequest('/api/portal/login', { method: 'POST', body, auth: false }),
   register: (body: { fullName: string; email: string; phone: string; password: string; bvn?: string; referralCode?: string }) =>
@@ -55,7 +84,7 @@ export const portalApi = {
   resetPassword: (body: { email: string; code: string; newPassword: string }) =>
     apiRequest('/api/portal/reset-password', { method: 'POST', body, auth: false }),
   getNotifications: () => apiRequest('/api/portal/notifications'),
-  getMe: () => apiRequest('/api/portal/me'),
+  getMe: () => apiRequest('/api/portal/me', { timeoutMs: 8000 }),
   getBanks: () => apiRequest('/api/portal/banks'),
   resolveAccount: (body: { bankCode: string; accountNumber: string }) =>
     apiRequest('/api/portal/resolve-account', { method: 'POST', body }),

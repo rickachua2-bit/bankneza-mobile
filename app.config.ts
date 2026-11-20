@@ -40,6 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       package: androidPackage,
       versionCode: Number(buildNumber) || 1,
       adaptiveIcon: {
+        foregroundImage: hasIcon ? './assets/icon.png' : undefined,
         backgroundColor: primaryColor,
       },
       permissions: ['USE_BIOMETRIC', 'USE_FINGERPRINT'],
