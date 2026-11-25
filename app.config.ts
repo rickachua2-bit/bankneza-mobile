@@ -45,7 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       },
       permissions: ['USE_BIOMETRIC', 'USE_FINGERPRINT'],
     },
-    plugins: ['expo-secure-store', 'expo-local-authentication', 'expo-notifications'],
+    plugins: ['expo-secure-store', 'expo-local-authentication', 'expo-notifications', 'expo-font'],
     extra: {
       tenantSlug,
       apiBaseUrl,

@@ -24,6 +24,7 @@ const ONBOARDING_KEY = 'bankneza_seen_onboarding_v3';
 function MainShell() {
   const theme = useTenantTheme();
   const [showSplash, setShowSplash] = useState(true);
+  const [fontsReady, setFontsReady] = useState(false);
   const [booting, setBooting] = useState(true);
   const [seenOnboarding, setSeenOnboarding] = useState(false);
   const [biometricLocked, setBiometricLocked] = useState(false);
@@ -66,7 +67,7 @@ function MainShell() {
 
   useEffect(() => {
     // Load vector icon font non-blockingly (native Android APK also has Ionicons.ttf in assets/fonts/)
-    Font.loadAsync(Ionicons.font).catch(() => {});
+    Font.loadAsync(Ionicons.font).catch(() => {}).finally(() => setFontsReady(true));
 
     // Show branded splash screen for 1.8s and enforce a hard 2.4s boot safety timer so app can NEVER hang
     const splashTimer = setTimeout(() => setShowSplash(false), 1800);
