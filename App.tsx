@@ -2,10 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import * as Font from 'expo-font';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from './src/components/AppIcons';
 import { isFeatureEnabled, ThemeProvider, useTenantTheme } from './src/theme/ThemeProvider';
 import { clearToken, getToken, portalApi } from './src/services/api';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
@@ -67,7 +66,7 @@ function MainShell() {
 
   useEffect(() => {
     // Load vector icon font non-blockingly (native Android APK also has Ionicons.ttf in assets/fonts/)
-    Font.loadAsync(Ionicons.font).catch(() => {}).finally(() => setFontsReady(true));
+    setFontsReady(true);
 
     // Show branded splash screen for 1.8s and enforce a hard 2.4s boot safety timer so app can NEVER hang
     const splashTimer = setTimeout(() => setShowSplash(false), 1800);

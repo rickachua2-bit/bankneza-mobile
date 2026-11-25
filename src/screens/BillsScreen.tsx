@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../components/AppIcons';
 import { portalApi } from '../services/api';
 import { isFeatureEnabled, useTenantTheme } from '../theme/ThemeProvider';
 import { Field, PrimaryButton } from '../components/Ui';

@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../components/AppIcons';
 import { isFeatureEnabled, useTenantTheme } from '../theme/ThemeProvider';
 import { portalApi } from '../services/api';
 import { Field, PrimaryButton } from '../components/Ui';
