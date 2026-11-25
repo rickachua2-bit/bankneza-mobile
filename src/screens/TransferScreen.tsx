@@ -24,6 +24,7 @@ export function TransferScreen({ customer, onSuccess }: { customer: any; onSucce
   const [amount, setAmount] = useState('');
   const [narration, setNarration] = useState('');
   const [totpCode, setTotpCode] = useState('');
+  const [transferPin, setTransferPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [receipt, setReceipt] = useState<any>(null);
 
@@ -90,6 +91,8 @@ export function TransferScreen({ customer, onSuccess }: { customer: any; onSucce
         amount: Number(amount),
         narration: narration.trim() || 'Transfer',
         totpCode: totpCode.trim() || undefined,
+        transferPin: transferPin.trim(),
+        setTransferPin: !customer?.hasTransferPin,
       });
       if (!res.success) return Alert.alert('Transfer Failed', res.error?.message || 'Unable to complete transfer.');
       if (saveBen) {
@@ -114,6 +117,7 @@ export function TransferScreen({ customer, onSuccess }: { customer: any; onSucce
       setAmount('');
       setNarration('');
       setTotpCode('');
+      setTransferPin('');
     } finally {
       setLoading(false);
     }
@@ -286,6 +290,15 @@ export function TransferScreen({ customer, onSuccess }: { customer: any; onSucce
 
           <Field label="Amount (₦)" value={amount} onChangeText={setAmount} keyboardType="numeric" placeholder="5000" />
           <Field label="Narration" value={narration} onChangeText={setNarration} placeholder="Invoice / Family Support" />
+          <Field
+            label={customer?.hasTransferPin ? '4-Digit Transfer PIN' : 'Create 4-Digit Transfer PIN (First-Time Setup)'}
+            value={transferPin}
+            onChangeText={setTransferPin}
+            keyboardType="number-pad"
+            maxLength={4}
+            secureTextEntry
+            placeholder="????"
+          />
           {customer?.totpEnabled && (
             <Field label="2FA Authenticator Code" value={totpCode} onChangeText={setTotpCode} keyboardType="number-pad" maxLength={6} placeholder="123456" />
           )}

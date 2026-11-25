@@ -96,6 +96,8 @@ export const portalApi = {
     amount: number;
     narration: string;
     totpCode?: string;
+    transferPin?: string;
+    setTransferPin?: boolean;
   }) => apiRequest('/api/portal/transfer', { method: 'POST', body }),
   resolveP2p: (identifier: string) =>
     apiRequest('/api/portal/p2p/resolve', { method: 'POST', body: { identifier } }),
@@ -125,6 +127,8 @@ export const portalApi = {
     apiRequest('/api/portal/kyc/upgrade', { method: 'POST', body }),
   setup2fa: () => apiRequest('/api/portal/security/2fa/setup', { method: 'POST' }),
   verify2fa: (code: string) => apiRequest('/api/portal/security/2fa/verify', { method: 'POST', body: { code } }),
+  setTransferPin: (transferPin: string) =>
+    apiRequest('/api/portal/security/transfer-pin', { method: 'POST', body: { transferPin } }),
   changePassword: (body: { currentPassword: string; newPassword: string }) =>
     apiRequest('/api/portal/security/change-password', { method: 'POST', body }),
   deleteAccount: () => apiRequest('/api/portal/account', { method: 'DELETE' }),

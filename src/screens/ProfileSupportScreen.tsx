@@ -35,8 +35,9 @@ export function ProfileSupportScreen({
   const [chatInput, setChatInput] = useState('');
   const [curPass, setCurPass] = useState('');
   const [newPass, setNewPass] = useState('');
+  const [newPin, setNewPin] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeModal, setActiveModal] = useState<null | 'kyc' | '2fa' | 'password' | 'support' | 'legal' | 'accounts'>(null);
+  const [activeModal, setActiveModal] = useState<null | 'kyc' | '2fa' | 'password' | 'pin' | 'support' | 'legal' | 'accounts'>(null);
 
   const isKycVerified = customer?.kycStatus === 'VERIFIED' || Number(customer?.kycTier || 0) >= 2;
   const provisionedAccounts: Array<{ currency: string; accountNumber: string; bankName: string; routingNumber?: string }> =
@@ -100,6 +101,21 @@ export function ProfileSupportScreen({
       setTotpCode('');
       setActiveModal(null);
       Alert.alert('2FA Enabled ✓', 'Two-Factor Authenticator protection is now active.');
+      onRefresh();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSavePin = async () => {
+    if (!/^\d{4}$/.test(newPin.trim())) return Alert.alert('Invalid PIN', 'Enter a 4-digit numeric Transfer PIN.');
+    setLoading(true);
+    try {
+      const res = await portalApi.setTransferPin(newPin.trim());
+      if (!res.success) return Alert.alert('Error', res.error?.message || 'Could not save Transfer PIN.');
+      setNewPin('');
+      setActiveModal(null);
+      Alert.alert('Transfer PIN Saved ?', 'Your 4-digit Transfer PIN is now active for all transfers.');
       onRefresh();
     } finally {
       setLoading(false);
@@ -262,6 +278,15 @@ export function ProfileSupportScreen({
           onPress={() => setActiveModal('2fa')}
         />
         <RowItem
+          icon="shield-checkmark"
+          iconBg="#ECFDF5"
+          iconColor="#059669"
+          title="4-Digit Transfer PIN"
+          subtitle={customer?.hasTransferPin ? 'PIN active ? tap to update' : 'Not set ? tap to create Transfer PIN'}
+          badge={customer?.hasTransferPin ? 'SET' : 'NEW'}
+          onPress={() => setActiveModal('pin')}
+        />
+        <RowItem
           icon="lock-closed"
           iconBg="#FEF3C7"
           iconColor="#D97706"
@@ -383,6 +408,20 @@ export function ProfileSupportScreen({
                 <PrimaryButton title="Confirm & Enable 2FA →" onPress={handleVerify2fa} loading={loading} color={theme.accentColor} />
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* TRANSFER PIN MODAL */}
+      <Modal visible={activeModal === 'pin'} transparent animationType="slide" onRequestClose={() => setActiveModal(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
+            <View style={styles.modalHdr}>
+              <Text style={[styles.modalTitle, { color: titleColor }]}>4-Digit Transfer PIN</Text>
+              <TouchableOpacity onPress={() => setActiveModal(null)}><Ionicons name="close-circle" size={24} color={mutedColor} /></TouchableOpacity>
+            </View>
+            <Field label="Enter 4-Digit Transfer PIN" value={newPin} onChangeText={setNewPin} keyboardType="number-pad" maxLength={4} secureTextEntry placeholder="1234" />
+            <PrimaryButton title="Save Transfer PIN ?" onPress={handleSavePin} loading={loading} color={theme.accentColor} />
           </View>
         </View>
       </Modal>
