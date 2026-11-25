@@ -37,10 +37,11 @@ export function HomeScreen({
   const [showKycModal, setShowKycModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
-  const [swapFrom, setSwapFrom] = useState<'NGN' | 'USD' | 'GBP' | 'EUR'>('NGN');
-  const [swapTo, setSwapTo] = useState<'USD' | 'NGN' | 'GBP' | 'EUR'>('USD');
+  const [swapFrom, setSwapFrom] = useState<string>('NGN');
+  const [swapTo, setSwapTo] = useState<string>('USD');
   const [swapAmt, setSwapAmt] = useState('');
   const [swapLoading, setSwapLoading] = useState(false);
+  const [liveFxRates, setLiveFxRates] = useState<Record<string, number>>({});
   const [kycMode, setKycMode] = useState<'PERSONAL' | 'BUSINESS'>('PERSONAL');
   const [bvn, setBvn] = useState('');
   const [nin, setNin] = useState('');
@@ -88,8 +89,15 @@ export function HomeScreen({
     if (res.success && Array.isArray(res.data)) setNotifs(res.data);
   };
 
+  const loadFxRates = async () => {
+    const r: any = await portalApi.getFxRates().catch(() => ({ success: false, rates: {} }));
+    const ratesObj = r?.rates || r?.data?.rates || {};
+    if (ratesObj && typeof ratesObj === 'object') setLiveFxRates(ratesObj);
+  };
+
   useEffect(() => {
     loadNotifs();
+    loadFxRates();
   }, [customer?.id, customer?.kycStatus]);
 
   const handlePullRefresh = async () => {
@@ -123,6 +131,9 @@ export function HomeScreen({
     if (!swapAmt || Number(swapAmt) <= 0) {
       return Alert.alert('Invalid Amount', 'Enter a valid amount to convert.');
     }
+    if (swapFrom === swapTo) {
+      return Alert.alert('Select Currencies', 'Source and destination currencies must differ.');
+    }
     setSwapLoading(true);
     try {
       const res = await portalApi.fxSwap({
@@ -131,9 +142,10 @@ export function HomeScreen({
         amount: Number(swapAmt),
       });
       if (!res.success) return Alert.alert('Swap Failed', res.error?.message || 'Unable to complete currency swap.');
+      const outAmt = res.data?.destinationAmount;
       setShowSwapModal(false);
       setSwapAmt('');
-      Alert.alert('Swap Complete ✓', `Converted ${swapAmt} ${swapFrom} → ${swapTo} successfully.`);
+      Alert.alert('Swap Complete ???', `Converted ${swapAmt} ${swapFrom} ??? ${outAmt !== undefined ? `${outAmt} ${swapTo}` : swapTo} successfully.`);
       onRefresh();
     } finally {
       setSwapLoading(false);
@@ -422,7 +434,7 @@ export function HomeScreen({
             </TouchableOpacity>
           </View>
           <Text style={[styles.kudaBalance, { color: titleColor }]}>
-            {hideBal ? '••••••' : selectedCurr === 'NGN' ? fmt(customer?.walletBalanceNgn) : `${selectedCurr} 0.00`}
+            {hideBal ? '••••••' : selectedCurr === 'NGN' ? fmt(customer?.walletBalanceNgn) : `${selectedCurr} ${Number(customer?.fxBalances?.[selectedCurr] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`}
           </Text>
           <View style={{ width: '100%', marginTop: 12 }}>{renderAccountOrKycGate(false)}</View>
         </View>
@@ -431,10 +443,10 @@ export function HomeScreen({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
             {[
               { code: 'NGN' as const, label: 'Nigerian Naira', bal: fmt(customer?.walletBalanceNgn), bg: theme.primaryColor },
-              { code: 'USD' as const, label: 'US Dollar (ACH/Wire)', bal: '$0.00', bg: '#0F172A' },
-              { code: 'GBP' as const, label: 'British Pound (UK)', bal: '£0.00', bg: '#1E293B' },
-              { code: 'EUR' as const, label: 'Euro (SEPA IBAN)', bal: '€0.00', bg: '#334155' },
-              { code: 'USDT' as const, label: 'Tether (TRC-20)', bal: '0.00 USDT', bg: '#065F46' },
+              { code: 'USD' as const, label: 'US Dollar (ACH/Wire)', bal: `$${Number(customer?.fxBalances?.USD || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, bg: '#0F172A' },
+              { code: 'GBP' as const, label: 'British Pound (UK)', bal: `??${Number(customer?.fxBalances?.GBP || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, bg: '#1E293B' },
+              { code: 'EUR' as const, label: 'Euro (SEPA IBAN)', bal: `???${Number(customer?.fxBalances?.EUR || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, bg: '#334155' },
+              { code: 'USDT' as const, label: 'Tether (TRC-20)', bal: `${Number(customer?.fxBalances?.USDT || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDT`, bg: '#065F46' },
             ].map((w) => {
               const acc = provisionedAccounts.find((a) => a.currency === w.code);
               return (
@@ -742,8 +754,8 @@ export function HomeScreen({
               Convert funds immediately between your {theme.brandName} multi-currency wallets.
             </Text>
             <Text style={{ fontSize: 12, fontWeight: '800', color: titleColor, marginBottom: 6 }}>From Currency</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              {(['NGN', 'USD', 'GBP', 'EUR'] as const).map((c) => (
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              {['NGN', 'USD', 'GBP', 'EUR', 'CAD', 'USDT'].map((c) => (
                 <TouchableOpacity
                   key={c}
                   onPress={() => setSwapFrom(c)}
@@ -754,8 +766,8 @@ export function HomeScreen({
               ))}
             </View>
             <Text style={{ fontSize: 12, fontWeight: '800', color: titleColor, marginBottom: 6 }}>To Currency</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-              {(['USD', 'NGN', 'GBP', 'EUR'] as const).map((c) => (
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {['USD', 'NGN', 'GBP', 'EUR', 'CAD', 'USDT'].map((c) => (
                 <TouchableOpacity
                   key={c}
                   onPress={() => setSwapTo(c)}
@@ -766,6 +778,26 @@ export function HomeScreen({
               ))}
             </View>
             <Field label={`Amount (${swapFrom})`} value={swapAmt} onChangeText={setSwapAmt} keyboardType="numeric" placeholder="10000" />
+            {Number(swapAmt) > 0 && swapFrom !== swapTo && (
+              <View style={{ backgroundColor: isDark ? '#1E293B' : '#F1F5F9', padding: 10, borderRadius: 10, marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: theme.accentColor }}>
+                  Est. Receive: {(() => {
+                    const amt = Number(swapAmt || 0);
+                    let r = 0;
+                    if (swapTo === 'NGN') r = Number(liveFxRates[`${swapFrom}_NGN`] || 0);
+                    else if (swapFrom === 'NGN') {
+                      const p = Number(liveFxRates[`NGN_${swapTo}_PRICE`] || 0);
+                      r = p > 0 ? 1 / p : Number(liveFxRates[`NGN_${swapTo}`] || 0);
+                    } else {
+                      const f = Number(liveFxRates[`${swapFrom}_NGN`] || 0);
+                      const p = Number(liveFxRates[`NGN_${swapTo}_PRICE`] || 0);
+                      r = f > 0 && p > 0 ? f / p : 0;
+                    }
+                    return r > 0 ? `${(amt * r).toLocaleString(undefined, { maximumFractionDigits: swapTo === 'NGN' ? 2 : 4 })} ${swapTo}` : 'Live Slikcash Quote';
+                  })()}
+                </Text>
+              </View>
+            )}
             <PrimaryButton
               title={swapLoading ? 'Converting...' : `Swap ${swapFrom} → ${swapTo} Now`}
               onPress={handleInstantSwap}

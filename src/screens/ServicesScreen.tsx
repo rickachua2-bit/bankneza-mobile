@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '../components/AppIcons';
@@ -8,12 +8,6 @@ import { Card, Field, PrimaryButton } from '../components/Ui';
 
 type HubTab = 'REMIT' | 'FX' | 'CRYPTO' | 'FLIGHTS';
 
-const FX_RATES_TO_NGN: Record<string, number> = {
-  NGN: 1,
-  USD: 1620,
-  GBP: 2050,
-  EUR: 1750,
-};
 
 const CRYPTO_COINS = [
   { key: 'USDT_TRC20', label: 'USDT (TRC20)', coin: 'USDT', defaultNet: 'TRC20' },
@@ -40,9 +34,30 @@ export function ServicesScreen({ customer, onSuccess }: { customer?: any; onSucc
   const [remRouting, setRemRouting] = useState('');
   const [remAmt, setRemAmt] = useState('');
 
-  const [fxFrom, setFxFrom] = useState<'NGN' | 'USD' | 'GBP' | 'EUR'>('NGN');
-  const [fxTo, setFxTo] = useState<'USD' | 'NGN' | 'GBP' | 'EUR'>('USD');
+  const [fxFrom, setFxFrom] = useState<string>('NGN');
+  const [fxTo, setFxTo] = useState<string>('USD');
   const [fxAmt, setFxAmt] = useState('');
+  const [fxRatesMap, setFxRatesMap] = useState<Record<string, number>>({});
+  const [fxPairs, setFxPairs] = useState<any[]>([]);
+  const [fxLoadingRates, setFxLoadingRates] = useState(false);
+
+  const loadLiveFx = async (force = false) => {
+    setFxLoadingRates(true);
+    try {
+      const r: any = await portalApi.getFxRates(force);
+      const ratesObj = r?.rates || r?.data?.rates || {};
+      const pairsList = r?.pairs || r?.data?.pairs || [];
+      if (ratesObj && typeof ratesObj === 'object') setFxRatesMap(ratesObj);
+      if (Array.isArray(pairsList)) setFxPairs(pairsList);
+    } catch {
+    } finally {
+      setFxLoadingRates(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLiveFx(false);
+  }, []);
 
   const [fltFrom, setFltFrom] = useState('LOS');
   const [fltTo, setFltTo] = useState('ABV');
@@ -67,12 +82,35 @@ export function ServicesScreen({ customer, onSuccess }: { customer?: any; onSucc
   const mutedColor = isDark ? '#94A3B8' : '#64748B';
   const borderCol = isDark ? '#1E293B' : '#E2E8F0';
 
+  const getDirectionalRate = (from: string, to: string): number => {
+    if (from === to) return 1;
+    if (to === 'NGN') return Number(fxRatesMap[`${from}_NGN`] || 0);
+    if (from === 'NGN') {
+      const p = Number(fxRatesMap[`NGN_${to}_PRICE`] || 0);
+      if (p > 0) return 1 / p;
+      return Number(fxRatesMap[`NGN_${to}`] || 0);
+    }
+    const direct = Number(fxRatesMap[`${from}_${to}`] || 0);
+    if (direct > 0) return direct;
+    const f2n = Number(fxRatesMap[`${from}_NGN`] || 0);
+    const n2t = Number(fxRatesMap[`NGN_${to}_PRICE`] || 0);
+    return f2n > 0 && n2t > 0 ? f2n / n2t : 0;
+  };
+
   const previewSwapOutput = () => {
     const amt = Number(fxAmt || 0);
     if (amt <= 0) return '0.00';
-    const inNgn = amt * (FX_RATES_TO_NGN[fxFrom] || 1);
-    const out = inNgn / (FX_RATES_TO_NGN[fxTo] || 1);
-    return out.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const rate = getDirectionalRate(fxFrom, fxTo);
+    if (!rate || rate <= 0) return fxLoadingRates ? 'Loading...' : '???';
+    const out = amt * rate;
+    return out.toLocaleString(undefined, { maximumFractionDigits: fxTo === 'NGN' ? 2 : 4 });
+  };
+
+  const formatRatePill = (curr: string) => {
+    const buy = Number(fxRatesMap[`${curr}_NGN`] || 0);
+    const sell = Number(fxRatesMap[`NGN_${curr}_PRICE`] || 0);
+    if (!buy && !sell) return `${curr}: Live`;
+    return `1 ${curr}: ???${buy ? buy.toLocaleString() : '???'} / ???${sell ? sell.toLocaleString() : '???'}`;
   };
 
   return (
@@ -178,14 +216,24 @@ export function ServicesScreen({ customer, onSuccess }: { customer?: any; onSucc
 
       {hubTab === 'FX' && (
         <Card>
-          <Text style={[styles.title, { color: titleColor }]}>Instant Multi-Currency FX Swap</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <Text style={[styles.title, { color: titleColor, marginBottom: 0 }]}>Live Multi-Currency FX Swap</Text>
+            <TouchableOpacity
+              onPress={() => loadLiveFx(true)}
+              style={[styles.chip, { paddingHorizontal: 10, paddingVertical: 5, borderColor: theme.primaryColor }]}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '800', color: theme.primaryColor }}>
+                {fxLoadingRates ? 'Syncing...' : '??? Refresh Rate'}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 12 }}>
-            Convert instantly between NGN, USD, GBP, and EUR with zero hidden spread.
+            Live market rates synced with our core clearing desk across NGN, USD, GBP, EUR, CAD & USDT.
           </Text>
 
           <Text style={{ fontSize: 12, fontWeight: '800', color: titleColor, marginBottom: 6 }}>Convert From</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-            {(['NGN', 'USD', 'GBP', 'EUR'] as const).map((c) => (
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            {['NGN', 'USD', 'GBP', 'EUR', 'CAD', 'USDT'].map((c) => (
               <TouchableOpacity
                 key={c}
                 onPress={() => setFxFrom(c)}
@@ -197,8 +245,8 @@ export function ServicesScreen({ customer, onSuccess }: { customer?: any; onSucc
           </View>
 
           <Text style={{ fontSize: 12, fontWeight: '800', color: titleColor, marginBottom: 6 }}>Convert To</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-            {(['USD', 'NGN', 'GBP', 'EUR'] as const).map((c) => (
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+            {['USD', 'NGN', 'GBP', 'EUR', 'CAD', 'USDT'].map((c) => (
               <TouchableOpacity
                 key={c}
                 onPress={() => setFxTo(c)}
@@ -216,22 +264,34 @@ export function ServicesScreen({ customer, onSuccess }: { customer?: any; onSucc
             <Text style={{ fontSize: 22, fontWeight: '900', color: theme.accentColor, marginTop: 4 }}>
               {fxTo} {previewSwapOutput()}
             </Text>
-            <Text style={{ fontSize: 11, color: mutedColor, marginTop: 2 }}>
-              Indicative Rate: 1 USD ≈ ₦1,620 • 1 GBP ≈ ₦2,050 • 1 EUR ≈ ₦1,750
+            <Text style={{ fontSize: 11, color: mutedColor, marginTop: 4 }}>
+              {Object.keys(fxRatesMap).length > 0
+                ? `${formatRatePill('USD')} ??? ${formatRatePill('GBP')} ??? ${formatRatePill('EUR')}`
+                : 'Fetching live FX exchange rates...'}
             </Text>
           </View>
 
           <PrimaryButton
-            title={loading ? 'Converting...' : `Execute ${fxFrom} → ${fxTo} Swap Now →`}
+            title={loading ? 'Converting...' : `Execute ${fxFrom} ??? ${fxTo} Swap Now ???`}
             color={theme.primaryColor}
             disabled={loading}
             onPress={async () => {
               if (!fxAmt || Number(fxAmt) <= 0) return Alert.alert('Invalid Amount', 'Enter a valid amount to convert.');
+              if (fxFrom === fxTo) return Alert.alert('Select Currencies', 'From and To currencies must differ.');
               setLoading(true);
               try {
                 const r = await portalApi.fxSwap({ sourceCurrency: fxFrom, targetCurrency: fxTo, amount: Number(fxAmt) });
-                Alert.alert('FX Swap ✓', r.success ? `Converted ${fxAmt} ${fxFrom} to ${fxTo}!` : r.error?.message || 'Swap failed.');
-                if (r.success) onSuccess();
+                const outAmt = r.data?.destinationAmount;
+                Alert.alert(
+                  'FX Swap ???',
+                  r.success
+                    ? `Converted ${fxAmt} ${fxFrom} ??? ${outAmt !== undefined ? `${outAmt} ${fxTo}` : fxTo}!`
+                    : r.error?.message || 'Swap failed.'
+                );
+                if (r.success) {
+                  setFxAmt('');
+                  onSuccess();
+                }
               } finally {
                 setLoading(false);
               }

@@ -151,7 +151,9 @@ export const portalApi = {
   }) => apiRequest('/api/portal/flights/book', { method: 'POST', body }),
   fundBetting: (body: { operator: string; customerId: string; amount: number }) =>
     apiRequest('/api/portal/betting/fund', { method: 'POST', body }),
-  getFxRates: () => apiRequest('/api/portal/fx/rates'),
+  getFxRates: (refresh?: boolean) => apiRequest(refresh ? '/api/portal/fx/rates?refresh=true' : '/api/portal/fx/rates'),
+  getFxQuote: (body: { sourceCurrency: string; targetCurrency: string; amount: number }) =>
+    apiRequest('/api/portal/fx/quote', { method: 'POST', body }),
   fxSwap: (body: { sourceCurrency: string; targetCurrency: string; amount: number }) =>
     apiRequest('/api/portal/fx/swap', { method: 'POST', body }),
   sendRemittance: (body: { type: string; currency: string; beneficiaryName: string; accountNumber: string; amount: number }) =>
