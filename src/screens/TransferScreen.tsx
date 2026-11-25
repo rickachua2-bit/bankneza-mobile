@@ -8,7 +8,14 @@ import { Card, Field, PrimaryButton } from '../components/Ui';
 export function TransferScreen({ customer, onSuccess }: { customer: any; onSuccess: () => void }) {
   const theme = useTenantTheme();
   const isDark = theme.isDark;
-  const [mode, setMode] = useState<'BANK' | 'P2P'>('BANK');
+  const [mode, setMode] = useState<'BANK' | 'P2P' | 'CRYPTO'>('BANK');
+  const [cryptoMode, setCryptoMode] = useState<'INTERNAL' | 'EXTERNAL'>('INTERNAL');
+  const [cryptoCoin, setCryptoCoin] = useState('USDT');
+  const [cryptoNetwork, setCryptoNetwork] = useState('TRC20');
+  const [cryptoIdent, setCryptoIdent] = useState('');
+  const [cryptoRecipient, setCryptoRecipient] = useState<{ kind: string; fullName: string; email?: string; phone?: string } | null>(null);
+  const [cryptoLookingUp, setCryptoLookingUp] = useState(false);
+  const [cryptoDestAddr, setCryptoDestAddr] = useState('');
   const [banks, setBanks] = useState<Array<{ code: string; name: string }>>([]);
   const [beneficiaries, setBeneficiaries] = useState<Array<{ id: string; bankCode: string; bankName: string; accountNumber: string; accountName: string }>>([]);
   const [bankSearch, setBankSearch] = useState('');
@@ -156,27 +163,95 @@ export function TransferScreen({ customer, onSuccess }: { customer: any; onSucce
     }
   };
 
+  const resolveCryptoRec = async () => {
+    if (!cryptoIdent.trim()) return Alert.alert('Crypto Transfer', 'Enter email or merchant/user phone.');
+    setCryptoLookingUp(true);
+    try {
+      const res = await portalApi.resolveCryptoRecipient(cryptoIdent.trim());
+      if (!res.success || !res.data) {
+        setCryptoRecipient(null);
+        return Alert.alert('Not Found', res.error?.message || 'No customer or merchant found.');
+      }
+      setCryptoRecipient(res.data);
+    } finally {
+      setCryptoLookingUp(false);
+    }
+  };
+
+  const handleSendCrypto = async () => {
+    const amtNum = Number(amount);
+    if (!amtNum || isNaN(amtNum) || amtNum <= 0) {
+      return Alert.alert('Invalid Amount', 'Enter a positive crypto amount.');
+    }
+    if (cryptoMode === 'INTERNAL' && !cryptoIdent.trim()) {
+      return Alert.alert('Recipient Required', 'Enter recipient email or merchant phone number.');
+    }
+    if (cryptoMode === 'EXTERNAL' && !cryptoDestAddr.trim()) {
+      return Alert.alert('Address Required', 'Enter destination on-chain wallet address.');
+    }
+    if (!/^\d{4}$/.test(transferPin.trim())) {
+      return Alert.alert('PIN Required', 'Enter your 4-digit Transfer PIN.');
+    }
+    setLoading(true);
+    try {
+      const res = await portalApi.sendCrypto({
+        mode: cryptoMode,
+        currency: cryptoCoin,
+        network: cryptoMode === 'EXTERNAL' ? cryptoNetwork : undefined,
+        amount: amtNum,
+        recipientIdentifier: cryptoMode === 'INTERNAL' ? cryptoIdent.trim() : undefined,
+        destinationAddress: cryptoMode === 'EXTERNAL' ? cryptoDestAddr.trim() : undefined,
+        narration: narration.trim() || `${cryptoCoin} Crypto Transfer`,
+        transferPin: transferPin.trim(),
+        setTransferPin: !customer?.hasTransferPin,
+      });
+      if (!res.success) return Alert.alert('Crypto Transfer Failed', res.error?.message || 'Unable to complete crypto transfer.');
+      setReceipt({
+        type: cryptoMode === 'INTERNAL' ? `Crypto Internal (${cryptoCoin})` : `Crypto On-Chain (${cryptoCoin} ??? ${cryptoNetwork})`,
+        recipient: cryptoMode === 'INTERNAL' ? (res.data?.recipientName || cryptoRecipient?.fullName || cryptoIdent.trim()) : `${cryptoCoin} (${cryptoNetwork})`,
+        destination: cryptoMode === 'INTERNAL' ? cryptoIdent.trim() : cryptoDestAddr.trim(),
+        amount: res.data?.ngnEquivalent || amtNum,
+        reference: res.data?.reference || `CRYP-${Date.now()}`,
+        narration: narration.trim() || `${cryptoCoin} Transfer`,
+        cashback: 0,
+      });
+      setAmount('');
+      setNarration('');
+      setTransferPin('');
+      setCryptoDestAddr('');
+      setCryptoIdent('');
+      setCryptoRecipient(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filtered = banks.filter((b) => b.name.toLowerCase().includes(bankSearch.toLowerCase())).slice(0, 8);
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-      {/* TRANSFER MODE SWITCHER: BANK NIP vs INSTANT WALLET P2P */}
+      {/* TRANSFER MODE SWITCHER: BANK NIP vs P2P vs SEND CRYPTO */}
       <View style={[styles.modeBar, { backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}>
         <TouchableOpacity
           onPress={() => setMode('BANK')}
           style={[styles.modeBtn, mode === 'BANK' && { backgroundColor: theme.primaryColor }]}
         >
-          <Ionicons name="business" size={16} color={mode === 'BANK' ? '#fff' : titleColor} />
-          <Text style={[styles.modeTxt, { color: mode === 'BANK' ? '#fff' : titleColor }]}>To Any Bank</Text>
+          <Ionicons name="business" size={14} color={mode === 'BANK' ? '#fff' : titleColor} />
+          <Text style={[styles.modeTxt, { fontSize: 11.5, color: mode === 'BANK' ? '#fff' : titleColor }]}>Bank</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setMode('P2P')}
           style={[styles.modeBtn, mode === 'P2P' && { backgroundColor: theme.accentColor }]}
         >
-          <Ionicons name="flash" size={16} color={mode === 'P2P' ? '#fff' : titleColor} />
-          <Text style={[styles.modeTxt, { color: mode === 'P2P' ? '#fff' : titleColor }]}>
-            To {theme.brandName} User (Free)
-          </Text>
+          <Ionicons name="flash" size={14} color={mode === 'P2P' ? '#fff' : titleColor} />
+          <Text style={[styles.modeTxt, { fontSize: 11.5, color: mode === 'P2P' ? '#fff' : titleColor }]}>User (Free)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setMode('CRYPTO')}
+          style={[styles.modeBtn, mode === 'CRYPTO' && { backgroundColor: '#7C3AED' }]}
+        >
+          <Ionicons name="logo-bitcoin" size={14} color={mode === 'CRYPTO' ? '#fff' : titleColor} />
+          <Text style={[styles.modeTxt, { fontSize: 11.5, color: mode === 'CRYPTO' ? '#fff' : titleColor }]}>Crypto</Text>
         </TouchableOpacity>
       </View>
 
@@ -304,7 +379,7 @@ export function TransferScreen({ customer, onSuccess }: { customer: any; onSucce
           )}
           <PrimaryButton title={loading ? 'Sending Transfer...' : 'Send Bank Transfer Now →'} onPress={handleSendBank} color={theme.accentColor} disabled={loading} />
         </Card>
-      ) : (
+      ) : mode === 'P2P' ? (
         <Card>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <Text style={[styles.title, { color: titleColor, marginBottom: 0 }]}>
@@ -354,6 +429,123 @@ export function TransferScreen({ customer, onSuccess }: { customer: any; onSucce
             title={loading ? 'Sending Instant Transfer...' : `Send Free to ${p2pRecipient?.fullName || 'User'} →`}
             onPress={handleSendP2p}
             color={theme.accentColor}
+            disabled={loading}
+          />
+        </Card>
+      ) : (
+        <Card>
+          <Text style={[styles.title, { color: titleColor }]}>Send Crypto (Internal & On-Chain)</Text>
+          <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 12 }}>
+            Send USDT, USDC, BTC, ETH, SOL, BNB or TRX internally by email/merchant phone or externally on-chain.
+          </Text>
+
+          <Text style={{ fontSize: 11.5, fontWeight: '800', color: mutedColor, marginBottom: 6 }}>Select Asset</Text>
+          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+            {['USDT', 'USDC', 'BTC', 'ETH', 'SOL', 'BNB', 'TRX'].map((coin) => (
+              <TouchableOpacity
+                key={coin}
+                onPress={() => {
+                  setCryptoCoin(coin);
+                  if (coin === 'BTC') setCryptoNetwork('BITCOIN');
+                  else if (coin === 'SOL') setCryptoNetwork('SOLANA');
+                  else if (coin === 'ETH') setCryptoNetwork('ERC20');
+                  else if (coin === 'BNB') setCryptoNetwork('BEP20');
+                  else if (coin === 'TRX' || coin === 'USDT') setCryptoNetwork('TRC20');
+                }}
+                style={[styles.chip, { borderColor: borderCol }, cryptoCoin === coin && { backgroundColor: '#7C3AED', borderColor: '#7C3AED' }]}
+              >
+                <Text style={{ fontSize: 11.5, fontWeight: '800', color: cryptoCoin === coin ? '#fff' : titleColor }}>{coin}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            <TouchableOpacity
+              onPress={() => setCryptoMode('INTERNAL')}
+              style={[styles.chip, { flex: 1, alignItems: 'center', borderColor: borderCol }, cryptoMode === 'INTERNAL' && { backgroundColor: '#059669', borderColor: '#059669' }]}
+            >
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: cryptoMode === 'INTERNAL' ? '#fff' : titleColor }}>Internal (Email/Phone)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setCryptoMode('EXTERNAL')}
+              style={[styles.chip, { flex: 1, alignItems: 'center', borderColor: borderCol }, cryptoMode === 'EXTERNAL' && { backgroundColor: theme.accentColor, borderColor: theme.accentColor }]}
+            >
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: cryptoMode === 'EXTERNAL' ? '#fff' : titleColor }}>External (On-Chain)</Text>
+            </TouchableOpacity>
+          </View>
+
+          {cryptoMode === 'INTERNAL' ? (
+            <>
+              <Field
+                label="Recipient Email or Merchant / User Phone"
+                value={cryptoIdent}
+                onChangeText={(v) => {
+                  setCryptoIdent(v);
+                  setCryptoRecipient(null);
+                }}
+                autoCapitalize="none"
+                placeholder="email@domain.com or 08012345678"
+              />
+              <View style={{ marginBottom: 10 }}>
+                <PrimaryButton
+                  title={cryptoLookingUp ? 'Verifying...' : 'Verify User / Merchant ???'}
+                  onPress={resolveCryptoRec}
+                  color={theme.primaryColor}
+                />
+              </View>
+              {cryptoRecipient && (
+                <View style={[styles.resolvedBanner, { backgroundColor: '#DCFCE7' }]}>
+                  <Ionicons name="checkmark-circle" size={18} color="#15803D" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#15803D', fontWeight: '900', fontSize: 13 }}>
+                      {cryptoRecipient.fullName} ({cryptoRecipient.kind})
+                    </Text>
+                    <Text style={{ color: '#166534', fontSize: 11 }}>
+                      {cryptoRecipient.email || ''} {cryptoRecipient.phone ? `??? ${cryptoRecipient.phone}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: mutedColor, marginBottom: 6 }}>On-Chain Network</Text>
+              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                {['TRC20', 'ERC20', 'BEP20', 'POLYGON', 'SOLANA', 'BITCOIN'].map((net) => (
+                  <TouchableOpacity
+                    key={net}
+                    onPress={() => setCryptoNetwork(net)}
+                    style={[styles.chip, { borderColor: borderCol }, cryptoNetwork === net && { backgroundColor: theme.accentColor, borderColor: theme.accentColor }]}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: cryptoNetwork === net ? '#fff' : titleColor }}>{net}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Field
+                label={`Destination ${cryptoCoin} Address (${cryptoNetwork})`}
+                value={cryptoDestAddr}
+                onChangeText={setCryptoDestAddr}
+                autoCapitalize="none"
+                placeholder="Paste external wallet address"
+              />
+            </>
+          )}
+
+          <Field label={`Amount (${cryptoCoin})`} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="10" />
+          <Field label="Note / Narration" value={narration} onChangeText={setNarration} placeholder="Crypto payout" />
+          <Field
+            label={customer?.hasTransferPin ? '4-Digit Transfer PIN' : 'Create 4-Digit Transfer PIN (First-Time Setup)'}
+            value={transferPin}
+            onChangeText={setTransferPin}
+            keyboardType="number-pad"
+            maxLength={4}
+            secureTextEntry
+            placeholder="****"
+          />
+          <PrimaryButton
+            title={loading ? 'Sending Crypto...' : `Send ${cryptoCoin} (${cryptoMode === 'INTERNAL' ? 'Free Internal' : cryptoNetwork}) ???`}
+            onPress={handleSendCrypto}
+            color="#7C3AED"
             disabled={loading}
           />
         </Card>

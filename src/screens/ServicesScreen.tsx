@@ -15,7 +15,19 @@ const FX_RATES_TO_NGN: Record<string, number> = {
   EUR: 1750,
 };
 
-export function ServicesScreen({ onSuccess }: { onSuccess: () => void }) {
+const CRYPTO_COINS = [
+  { key: 'USDT_TRC20', label: 'USDT (TRC20)', coin: 'USDT', defaultNet: 'TRC20' },
+  { key: 'USDT_ERC20', label: 'USDT (ERC20)', coin: 'USDT', defaultNet: 'ERC20' },
+  { key: 'USDC', label: 'USDC', coin: 'USDC', defaultNet: 'SOLANA' },
+  { key: 'BTC', label: 'Bitcoin (BTC)', coin: 'BTC', defaultNet: 'BITCOIN' },
+  { key: 'ETH', label: 'Ethereum (ETH)', coin: 'ETH', defaultNet: 'ERC20' },
+  { key: 'SOL', label: 'Solana (SOL)', coin: 'SOL', defaultNet: 'SOLANA' },
+  { key: 'BNB', label: 'BNB (BSC)', coin: 'BNB', defaultNet: 'BEP20' },
+  { key: 'TRX', label: 'TRON (TRX)', coin: 'TRX', defaultNet: 'TRC20' },
+];
+const CHAIN_NETWORKS = ['TRC20', 'ERC20', 'BEP20', 'POLYGON', 'SOLANA', 'BITCOIN'];
+
+export function ServicesScreen({ customer, onSuccess }: { customer?: any; onSuccess: () => void }) {
   const theme = useTenantTheme();
   const isDark = theme.isDark;
   const [hubTab, setHubTab] = useState<HubTab>('REMIT');
@@ -39,6 +51,17 @@ export function ServicesScreen({ onSuccess }: { onSuccess: () => void }) {
 
   const [cryptoAsset, setCryptoAsset] = useState('USDT_TRC20');
   const [cryptoAddr, setCryptoAddr] = useState('');
+  const [cryptoAction, setCryptoAction] = useState<'RECEIVE' | 'SEND'>('SEND');
+  const [sendCoin, setSendCoin] = useState('USDT');
+  const [sendMode, setSendMode] = useState<'INTERNAL' | 'EXTERNAL'>('INTERNAL');
+  const [sendNetwork, setSendNetwork] = useState('TRC20');
+  const [sendDestAddr, setSendDestAddr] = useState('');
+  const [sendIdent, setSendIdent] = useState('');
+  const [sendRecipient, setSendRecipient] = useState<{ kind: string; fullName: string; email?: string; phone?: string } | null>(null);
+  const [sendLookingUp, setSendLookingUp] = useState(false);
+  const [sendAmt, setSendAmt] = useState('');
+  const [sendNote, setSendNote] = useState('');
+  const [sendPin, setSendPin] = useState('');
 
   const titleColor = isDark ? '#F8FAFC' : '#0F172A';
   const mutedColor = isDark ? '#94A3B8' : '#64748B';
@@ -219,72 +242,256 @@ export function ServicesScreen({ onSuccess }: { onSuccess: () => void }) {
 
       {hubTab === 'CRYPTO' && (
         <Card>
-          <Text style={[styles.title, { color: titleColor }]}>Crypto & Stablecoin Vault</Text>
+          <Text style={[styles.title, { color: titleColor }]}>Multi-Chain Crypto Vault</Text>
           <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 12 }}>
-            Receive USDT or USDC directly into your {theme.brandName} multi-chain treasury address.
+            Send or receive USDT, USDC, BTC, ETH, SOL, BNB & TRX ??? internally via Email/Phone or externally on-chain.
           </Text>
 
-          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-            {['USDT_TRC20', 'USDT_ERC20', 'USDC', 'BTC'].map((c) => (
-              <TouchableOpacity
-                key={c}
-                onPress={() => {
-                  setCryptoAsset(c);
-                  setCryptoAddr('');
-                }}
-                style={[styles.chip, cryptoAsset === c && { backgroundColor: theme.primaryColor, borderColor: theme.primaryColor }]}
-              >
-                <Text style={{ fontSize: 11.5, fontWeight: '800', color: cryptoAsset === c ? '#fff' : titleColor }}>{c}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+            <TouchableOpacity
+              onPress={() => setCryptoAction('SEND')}
+              style={[
+                styles.chip,
+                { flex: 1, alignItems: 'center', paddingVertical: 10 },
+                cryptoAction === 'SEND' && { backgroundColor: theme.accentColor, borderColor: theme.accentColor },
+              ]}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '900', color: cryptoAction === 'SEND' ? '#fff' : titleColor }}>Send Crypto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setCryptoAction('RECEIVE')}
+              style={[
+                styles.chip,
+                { flex: 1, alignItems: 'center', paddingVertical: 10 },
+                cryptoAction === 'RECEIVE' && { backgroundColor: theme.primaryColor, borderColor: theme.primaryColor },
+              ]}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '900', color: cryptoAction === 'RECEIVE' ? '#fff' : titleColor }}>Receive / Deposit</Text>
+            </TouchableOpacity>
           </View>
 
-          <PrimaryButton
-            title={loading ? 'Generating Address...' : `Get Dedicated ${cryptoAsset} Deposit Address →`}
-            color={theme.accentColor}
-            disabled={loading}
-            onPress={async () => {
-              setLoading(true);
-              try {
-                const r = await portalApi.generateCryptoAddress({ currency: cryptoAsset });
-                const addr = r.data?.address || r.data?.walletAddress;
-                if (r.success && addr) setCryptoAddr(addr);
-                else Alert.alert('Crypto Desk', r.error?.message || 'Could not generate address.');
-              } finally {
-                setLoading(false);
-              }
-            }}
-          />
+          {cryptoAction === 'RECEIVE' ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                {CRYPTO_COINS.map((c) => (
+                  <TouchableOpacity
+                    key={c.key}
+                    onPress={() => {
+                      setCryptoAsset(c.key);
+                      setCryptoAddr('');
+                    }}
+                    style={[styles.chip, cryptoAsset === c.key && { backgroundColor: theme.primaryColor, borderColor: theme.primaryColor }]}
+                  >
+                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: cryptoAsset === c.key ? '#fff' : titleColor }}>{c.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-          {cryptoAddr ? (
-            <View style={[styles.cryptoBox, { backgroundColor: '#065F46' }]}>
-              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800' }}>
-                {cryptoAsset} DEPOSIT ADDRESS
-              </Text>
-              <Text selectable style={{ color: '#fff', fontSize: 14.5, fontWeight: '900', marginVertical: 10 }}>
-                {cryptoAddr}
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
+              <PrimaryButton
+                title={loading ? 'Generating Address...' : `Get Dedicated ${cryptoAsset} Deposit Address ???`}
+                color={theme.accentColor}
+                disabled={loading}
+                onPress={async () => {
+                  setLoading(true);
+                  try {
+                    const chosen = CRYPTO_COINS.find((x) => x.key === cryptoAsset);
+                    const r = await portalApi.generateCryptoAddress({ currency: cryptoAsset, network: chosen?.defaultNet });
+                    const addr = r.data?.address || r.data?.walletAddress;
+                    if (r.success && addr) setCryptoAddr(addr);
+                    else Alert.alert('Crypto Desk', r.error?.message || 'Could not generate address.');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              />
+
+              {cryptoAddr ? (
+                <View style={[styles.cryptoBox, { backgroundColor: '#065F46' }]}>
+                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800' }}>
+                    {cryptoAsset} DEPOSIT ADDRESS
+                  </Text>
+                  <Text selectable style={{ color: '#fff', fontSize: 14.5, fontWeight: '900', marginVertical: 10 }}>
+                    {cryptoAddr}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(cryptoAddr);
+                        Alert.alert('Copied ???', `${cryptoAsset} address copied to clipboard.`);
+                      }}
+                      style={styles.cryptoActionBtn}
+                    >
+                      <Ionicons name="copy" size={14} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Copy Address</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => Share.share({ message: `${theme.brandName} ${cryptoAsset} Address:\n${cryptoAddr}` })}
+                      style={styles.cryptoActionBtn}
+                    >
+                      <Ionicons name="share-social" size={14} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: mutedColor, marginBottom: 6 }}>Select Coin</Text>
+              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                {['USDT', 'USDC', 'BTC', 'ETH', 'SOL', 'BNB', 'TRX'].map((coin) => (
+                  <TouchableOpacity
+                    key={coin}
+                    onPress={() => {
+                      setSendCoin(coin);
+                      if (coin === 'BTC') setSendNetwork('BITCOIN');
+                      else if (coin === 'SOL') setSendNetwork('SOLANA');
+                      else if (coin === 'ETH') setSendNetwork('ERC20');
+                      else if (coin === 'BNB') setSendNetwork('BEP20');
+                      else if (coin === 'TRX' || coin === 'USDT') setSendNetwork('TRC20');
+                    }}
+                    style={[styles.chip, sendCoin === coin && { backgroundColor: theme.primaryColor, borderColor: theme.primaryColor }]}
+                  >
+                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: sendCoin === coin ? '#fff' : titleColor }}>{coin}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: mutedColor, marginBottom: 6 }}>Transfer Route</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                 <TouchableOpacity
-                  onPress={async () => {
-                    await Clipboard.setStringAsync(cryptoAddr);
-                    Alert.alert('Copied ✓', `${cryptoAsset} address copied to clipboard.`);
-                  }}
-                  style={styles.cryptoActionBtn}
+                  onPress={() => setSendMode('INTERNAL')}
+                  style={[styles.chip, { flex: 1, alignItems: 'center' }, sendMode === 'INTERNAL' && { backgroundColor: '#059669', borderColor: '#059669' }]}
                 >
-                  <Ionicons name="copy" size={14} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Copy Address</Text>
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: sendMode === 'INTERNAL' ? '#fff' : titleColor }}>Internal (Email / Phone)</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => Share.share({ message: `${theme.brandName} ${cryptoAsset} Address:\n${cryptoAddr}` })}
-                  style={styles.cryptoActionBtn}
+                  onPress={() => setSendMode('EXTERNAL')}
+                  style={[styles.chip, { flex: 1, alignItems: 'center' }, sendMode === 'EXTERNAL' && { backgroundColor: theme.accentColor, borderColor: theme.accentColor }]}
                 >
-                  <Ionicons name="share-social" size={14} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Share</Text>
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: sendMode === 'EXTERNAL' ? '#fff' : titleColor }}>External (On-Chain)</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          ) : null}
+
+              {sendMode === 'INTERNAL' ? (
+                <>
+                  <Field
+                    label="Recipient Email or Merchant / User Phone"
+                    value={sendIdent}
+                    onChangeText={(v) => {
+                      setSendIdent(v);
+                      setSendRecipient(null);
+                    }}
+                    autoCapitalize="none"
+                    placeholder="user@email.com or 08012345678"
+                  />
+                  <View style={{ marginBottom: 10 }}>
+                    <PrimaryButton
+                      title={sendLookingUp ? 'Checking Recipient...' : 'Verify User / Merchant ???'}
+                      color={theme.primaryColor}
+                      disabled={sendLookingUp}
+                      onPress={async () => {
+                        if (!sendIdent.trim()) return Alert.alert('Crypto Send', 'Enter email or phone.');
+                        setSendLookingUp(true);
+                        try {
+                          const r = await portalApi.resolveCryptoRecipient(sendIdent.trim());
+                          if (r.success && r.data) setSendRecipient(r.data);
+                          else {
+                            setSendRecipient(null);
+                            Alert.alert('Not Found', r.error?.message || 'No customer or merchant found.');
+                          }
+                        } finally {
+                          setSendLookingUp(false);
+                        }
+                      }}
+                    />
+                  </View>
+                  {sendRecipient && (
+                    <View style={{ backgroundColor: '#DCFCE7', padding: 10, borderRadius: 10, marginBottom: 10 }}>
+                      <Text style={{ color: '#15803D', fontWeight: '900', fontSize: 13 }}>
+                        ??? {sendRecipient.fullName} ({sendRecipient.kind})
+                      </Text>
+                      <Text style={{ color: '#166534', fontSize: 11 }}>
+                        {sendRecipient.email || ''} {sendRecipient.phone ? `??? ${sendRecipient.phone}` : ''}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: mutedColor, marginBottom: 6 }}>On-Chain Network</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                    {CHAIN_NETWORKS.map((net) => (
+                      <TouchableOpacity
+                        key={net}
+                        onPress={() => setSendNetwork(net)}
+                        style={[styles.chip, sendNetwork === net && { backgroundColor: theme.accentColor, borderColor: theme.accentColor }]}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: sendNetwork === net ? '#fff' : titleColor }}>{net}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Field
+                    label={`Destination ${sendCoin} Wallet Address (${sendNetwork})`}
+                    value={sendDestAddr}
+                    onChangeText={setSendDestAddr}
+                    autoCapitalize="none"
+                    placeholder="Paste wallet address"
+                  />
+                </>
+              )}
+
+              <Field label={`Amount (${sendCoin})`} value={sendAmt} onChangeText={setSendAmt} keyboardType="decimal-pad" placeholder="10" />
+              <Field label="Narration (Optional)" value={sendNote} onChangeText={setSendNote} placeholder="Crypto settlement" />
+              <Field
+                label={customer?.hasTransferPin ? '4-Digit Transfer PIN' : 'Create 4-Digit Transfer PIN (First-Time Setup)'}
+                value={sendPin}
+                onChangeText={setSendPin}
+                keyboardType="number-pad"
+                maxLength={4}
+                secureTextEntry
+                placeholder="****"
+              />
+
+              <PrimaryButton
+                title={loading ? 'Sending Crypto...' : `Send ${sendCoin} (${sendMode === 'INTERNAL' ? 'Instant Free' : sendNetwork}) ???`}
+                color={theme.accentColor}
+                disabled={loading}
+                onPress={async () => {
+                  const amtNum = Number(sendAmt);
+                  if (!amtNum || isNaN(amtNum) || amtNum <= 0) return Alert.alert('Invalid Amount', 'Enter a positive crypto amount.');
+                  if (sendMode === 'INTERNAL' && !sendIdent.trim()) return Alert.alert('Recipient Required', 'Enter recipient email or merchant phone.');
+                  if (sendMode === 'EXTERNAL' && !sendDestAddr.trim()) return Alert.alert('Address Required', 'Enter external wallet address.');
+                  if (!/^\d{4}$/.test(sendPin.trim())) return Alert.alert('PIN Required', 'Enter your 4-digit Transfer PIN.');
+                  setLoading(true);
+                  try {
+                    const r = await portalApi.sendCrypto({
+                      mode: sendMode,
+                      currency: sendCoin,
+                      network: sendMode === 'EXTERNAL' ? sendNetwork : undefined,
+                      amount: amtNum,
+                      recipientIdentifier: sendMode === 'INTERNAL' ? sendIdent.trim() : undefined,
+                      destinationAddress: sendMode === 'EXTERNAL' ? sendDestAddr.trim() : undefined,
+                      narration: sendNote.trim() || `${sendCoin} transfer`,
+                      transferPin: sendPin.trim(),
+                      setTransferPin: customer ? !customer.hasTransferPin : false,
+                    });
+                    if (!r.success) return Alert.alert('Crypto Transfer Failed', r.error?.message || 'Unable to process crypto transfer.');
+                    Alert.alert('Crypto Transfer Sent ???', `${amtNum} ${sendCoin} processed.\nRef: ${r.data?.reference || 'CONFIRMED'}`);
+                    setSendAmt('');
+                    setSendNote('');
+                    setSendPin('');
+                    setSendDestAddr('');
+                    setSendIdent('');
+                    setSendRecipient(null);
+                    onSuccess();
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              />
+            </>
+          )}
         </Card>
       )}
 

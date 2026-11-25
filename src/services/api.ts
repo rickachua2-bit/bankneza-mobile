@@ -157,6 +157,19 @@ export const portalApi = {
   sendRemittance: (body: { type: string; currency: string; beneficiaryName: string; accountNumber: string; amount: number }) =>
     apiRequest('/api/portal/remittance/send', { method: 'POST', body }),
   getCryptoDesk: () => apiRequest('/api/portal/crypto/desk'),
-  generateCryptoAddress: (body: { currency: string }) =>
+  generateCryptoAddress: (body: { currency: string; network?: string }) =>
     apiRequest('/api/portal/crypto/address', { method: 'POST', body }),
+  resolveCryptoRecipient: (identifier: string) =>
+    apiRequest('/api/portal/crypto/resolve-recipient', { method: 'POST', body: { identifier } }),
+  sendCrypto: (body: {
+    mode: 'INTERNAL' | 'EXTERNAL';
+    currency: string;
+    network?: string;
+    amount: number;
+    destinationAddress?: string;
+    recipientIdentifier?: string;
+    narration?: string;
+    transferPin: string;
+    setTransferPin?: boolean;
+  }) => apiRequest('/api/portal/crypto/withdraw', { method: 'POST', body }),
 };

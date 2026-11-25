@@ -239,6 +239,7 @@ function MainShell() {
         {tab === 'cards' && <CardsScreen customer={customer} onRefresh={() => loadCustomer(true)} />}
         {tab === 'services' && (
           <ServicesScreen
+            customer={customer}
             onSuccess={() => {
               loadCustomer(true);
               setTab('home');
