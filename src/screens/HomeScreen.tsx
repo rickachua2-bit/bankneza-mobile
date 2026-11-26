@@ -51,6 +51,16 @@ export function HomeScreen({
   const [txFilter, setTxFilter] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL');
 
   const fmt = (n: number) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
+  const fmtSelectedBal = (curr: string) => {
+    if (curr === 'NGN') return fmt(customer?.walletBalanceNgn);
+    const val = Number(customer?.fxBalances?.[curr] || 0);
+    const sym = curr === 'USD' ? '$' : curr === 'GBP' ? '??' : curr === 'EUR' ? '???' : '';
+    const formatted = val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    return sym ? `${sym}${formatted}` : `${formatted} ${curr}`;
+  };
+  const activeFxChips = (['USD', 'GBP', 'EUR', 'USDT'] as const)
+    .map((k) => ({ k, val: Number(customer?.fxBalances?.[k] || 0) }))
+    .filter((x) => x.val > 0);
   const txs = Array.isArray(customer?.transactions) ? customer.transactions : [];
   const provisionedAccounts: Array<{
     currency: string;
@@ -487,7 +497,22 @@ export function HomeScreen({
               <Ionicons name={hideBal ? 'eye-off' : 'eye'} size={18} color="#fff" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.heroAmount}>{hideBal ? '₦ ••••••' : fmt(customer?.walletBalanceNgn)}</Text>
+          <Text style={styles.heroAmount}>{hideBal ? '??????????????????' : fmtSelectedBal(selectedCurr)}</Text>
+          {!hideBal && activeFxChips.length > 0 && selectedCurr === 'NGN' && (
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {activeFxChips.map((x) => (
+                <TouchableOpacity
+                  key={x.k}
+                  onPress={() => setSelectedCurr(x.k)}
+                  style={{ backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 11.5, fontWeight: '800' }}>
+                    {x.k}: {fmtSelectedBal(x.k)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
             <View style={styles.moniePill}>
               <Text style={styles.moniePillTxt}>Cashback: {fmt(customer?.cashbackEarnedNgn || 0)}</Text>
@@ -505,7 +530,22 @@ export function HomeScreen({
               <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11.5, fontWeight: '800', letterSpacing: 0.6 }}>
                 {theme.brandName.toUpperCase()} MULTI-CURRENCY VAULT
               </Text>
-              <Text style={styles.heroAmount}>{hideBal ? '₦ ••••••' : fmt(customer?.walletBalanceNgn)}</Text>
+              <Text style={styles.heroAmount}>{hideBal ? '??????????????????' : fmtSelectedBal(selectedCurr)}</Text>
+          {!hideBal && activeFxChips.length > 0 && selectedCurr === 'NGN' && (
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {activeFxChips.map((x) => (
+                <TouchableOpacity
+                  key={x.k}
+                  onPress={() => setSelectedCurr(x.k)}
+                  style={{ backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 11.5, fontWeight: '800' }}>
+                    {x.k}: {fmtSelectedBal(x.k)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
             </View>
             <TouchableOpacity onPress={() => onNavigate('cards')} style={[styles.cardMiniBadge, { backgroundColor: theme.accentColor }]}>
               <Ionicons name="card" size={18} color="#fff" />
@@ -543,7 +583,22 @@ export function HomeScreen({
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11.5 }}>+ Add Money</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.heroAmount}>{hideBal ? '₦ ••••••' : fmt(customer?.walletBalanceNgn)}</Text>
+          <Text style={styles.heroAmount}>{hideBal ? '??????????????????' : fmtSelectedBal(selectedCurr)}</Text>
+          {!hideBal && activeFxChips.length > 0 && selectedCurr === 'NGN' && (
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {activeFxChips.map((x) => (
+                <TouchableOpacity
+                  key={x.k}
+                  onPress={() => setSelectedCurr(x.k)}
+                  style={{ backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 11.5, fontWeight: '800' }}>
+                    {x.k}: {fmtSelectedBal(x.k)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
           {renderAccountOrKycGate(true)}
         </View>
       )}
