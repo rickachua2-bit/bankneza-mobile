@@ -113,8 +113,10 @@ export const portalApi = {
     apiRequest('/api/portal/bills/validate', { method: 'POST', body }),
   purchaseBill: (body: { category: string; providerName: string; customerRef: string; amountNgn: number; planCode?: string }) =>
     apiRequest('/api/portal/bills/purchase', { method: 'POST', body }),
-  issueVirtualCard: (body: { cardScheme: string; currency: string }) =>
+  issueVirtualCard: (body: { cardScheme: string; currency: string; amount?: number }) =>
     apiRequest('/api/portal/cards/virtual', { method: 'POST', body }),
+  getVirtualCardDetails: (id: string) =>
+    apiRequest(`/api/portal/cards/virtual/${id}/details`),
   toggleVirtualCard: (id: string, status: 'ACTIVE' | 'FROZEN') =>
     apiRequest(`/api/portal/cards/virtual/${id}/status`, { method: 'PATCH', body: { status } }),
   fundVirtualCard: (id: string, amount: number) =>

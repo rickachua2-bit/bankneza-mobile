@@ -6,31 +6,31 @@ import { portalApi } from '../services/api';
 import { useTenantTheme } from '../theme/ThemeProvider';
 import { Card, Field, PrimaryButton } from '../components/Ui';
 
-function deriveFullPanAndCvv(vc: any): { fullPan: string; cvv: string; billingAddress: string } {
-  const bin = vc.cardScheme === 'VISA' ? '4288' : vc.cardScheme === 'MASTERCARD' ? '5399' : '5061';
-  const seed = String(vc.id || vc.reference || '84920174');
-  let digits = '';
-  for (let i = 0; i < seed.length; i++) {
-    digits += String(seed.charCodeAt(i) % 10);
-  }
-  digits = (digits + '739284615029').slice(0, 12);
-  const last4 = String(vc.last4 || digits.slice(4, 8)).slice(0, 4);
-  const fullPan = `${bin} ${digits.slice(0, 4)} ${digits.slice(4, 8)} ${last4}`;
-  const cvv = digits.slice(8, 11);
-  const billingAddress =
-    vc.currency === 'USD'
-      ? '251 Little Falls Drive, Wilmington, DE 19808, USA'
-      : '14 Adeola Odeku Street, Victoria Island, Lagos, NG';
-  return { fullPan, cvv, billingAddress };
-}
-
 export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh: () => void }) {
   const theme = useTenantTheme();
   const isDark = theme.isDark;
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState(customer?.phone || '');
   const [loading, setLoading] = useState(false);
-  const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
+  const [revealedDetails, setRevealedDetails] = useState<Record<string, { fullPan: string; cvv: string; billingAddress?: string } | null>>({});
+  const [revealingId, setRevealingId] = useState<string | null>(null);
+
+  const toggleReveal = async (vc: any) => {
+    if (revealedDetails[vc.id]) {
+      setRevealedDetails((prev) => ({ ...prev, [vc.id]: null }));
+      return;
+    }
+    setRevealingId(vc.id);
+    try {
+      const res = await portalApi.getVirtualCardDetails(vc.id);
+      if (!res.success || !res.data) {
+        return Alert.alert('Card Details', res.error?.message || 'Unable to fetch live card details from issuer.');
+      }
+      setRevealedDetails((prev) => ({ ...prev, [vc.id]: res.data }));
+    } finally {
+      setRevealingId(null);
+    }
+  };
   const [fundTarget, setFundTarget] = useState<any>(null);
   const [fundAmt, setFundAmt] = useState('');
   const [pinTarget, setPinTarget] = useState<{ kind: 'virtual' | 'physical'; id: string; hasPin: boolean; label: string } | null>(null);
@@ -165,8 +165,11 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
         ) : (
           vCards.map((vc: any) => {
             const cardColor = vc.status === 'FROZEN' ? '#475569' : vc.currency === 'USD' ? theme.primaryColor : '#065F46';
-            const revealed = Boolean(revealedIds[vc.id]);
-            const { fullPan, cvv, billingAddress } = deriveFullPanAndCvv(vc);
+            const details = revealedDetails[vc.id];
+            const revealed = Boolean(details);
+            const fullPan = details?.fullPan || vc.maskedPan;
+            const cvv = details?.cvv || '';
+            const billingAddress = details?.billingAddress || '';
             return (
               <View key={vc.id} style={[styles.visualCard, { backgroundColor: cardColor }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -185,7 +188,8 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
                   <Text style={styles.cardPan}>{revealed ? fullPan : vc.maskedPan}</Text>
                   <TouchableOpacity
                     onPress={async () => {
-                      await Clipboard.setStringAsync(fullPan.replace(/\s+/g, ''));
+                      if (!revealed) return Alert.alert('Reveal First', 'Tap Show PAN/CVV to fetch the live card number first.');
+                      await Clipboard.setStringAsync(String(fullPan).replace(/\s+/g, ''));
                       Alert.alert('Copied ✓', '16-digit card number copied to clipboard.');
                     }}
                     style={styles.copyIconBtn}
@@ -217,11 +221,11 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
                 {/* CARD ACTION BAR: SHOW DETAILS • + FUND CARD • FREEZE */}
                 <View style={styles.cardActionRow}>
                   <TouchableOpacity
-                    onPress={() => setRevealedIds((prev) => ({ ...prev, [vc.id]: !prev[vc.id] }))}
+                    onPress={() => toggleReveal(vc)}
                     style={styles.cardActionBtn}
                   >
                     <Ionicons name={revealed ? 'eye-off' : 'eye'} size={15} color="#fff" />
-                    <Text style={styles.cardActionTxt}>{revealed ? 'Hide PAN/CVV' : 'Show PAN/CVV'}</Text>
+                    <Text style={styles.cardActionTxt}>{revealingId === vc.id ? 'Loading...' : revealed ? 'Hide PAN/CVV' : 'Show PAN/CVV'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setFundTarget(vc)} style={[styles.cardActionBtn, { backgroundColor: theme.accentColor }]}>
                     <Ionicons name="add-circle" size={15} color="#fff" />
