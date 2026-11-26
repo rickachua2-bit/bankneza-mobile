@@ -14,6 +14,21 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
   const [loading, setLoading] = useState(false);
   const [revealedDetails, setRevealedDetails] = useState<Record<string, { fullPan: string; cvv: string; billingAddress?: string } | null>>({});
   const [revealingId, setRevealingId] = useState<string | null>(null);
+  const [cardHistoryTarget, setCardHistoryTarget] = useState<{ card: any; loading: boolean; transactions: any[] } | null>(null);
+
+  const openCardHistory = async (vc: any) => {
+    setCardHistoryTarget({ card: vc, loading: true, transactions: [] });
+    try {
+      const res = await portalApi.getVirtualCardTransactions(vc.id);
+      setCardHistoryTarget({
+        card: vc,
+        loading: false,
+        transactions: Array.isArray(res?.data?.transactions) ? res.data.transactions : [],
+      });
+    } catch {
+      setCardHistoryTarget({ card: vc, loading: false, transactions: [] });
+    }
+  };
 
   const toggleReveal = async (vc: any) => {
     if (revealedDetails[vc.id]) {
@@ -245,6 +260,13 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
                     <Ionicons name="key" size={15} color="#fff" />
                     <Text style={styles.cardActionTxt}>{vc.hasPin ? 'PIN' : 'Set PIN'}</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => openCardHistory(vc)}
+                    style={styles.cardActionBtn}
+                  >
+                    <Ionicons name="time" size={15} color="#fff" />
+                    <Text style={styles.cardActionTxt}>History</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             );
@@ -255,12 +277,12 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
       <Card>
         <Text style={[styles.title, { color: titleColor }]}>Order Physical Chip & PIN ATM Card</Text>
         <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 10 }}>
-          Card fee (???{physFee.toLocaleString()}) is deducted automatically from your NGN wallet balance.
+          Card fee (\u20a6{physFee.toLocaleString()}) is deducted automatically from your NGN wallet balance.
         </Text>
         <Field label="Nationwide Delivery Address" value={address} onChangeText={setAddress} placeholder="12 Admiralty Way, Lekki Phase 1, Lagos" />
         <Field label="Contact Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
         <Field label="Set 4-Digit Card PIN (Optional)" value={orderPin} onChangeText={setOrderPin} keyboardType="number-pad" maxLength={4} secureTextEntry placeholder="****" />
-        <PrimaryButton title={loading ? 'Processing...' : `Order Physical ATM Card (???${physFee.toLocaleString()}) ???`} onPress={orderPhysical} color={theme.primaryColor} disabled={loading} />
+        <PrimaryButton title={loading ? 'Processing...' : `Order Physical ATM Card (\u20a6${physFee.toLocaleString()})`} onPress={orderPhysical} color={theme.primaryColor} disabled={loading} />
 
         {pOrders.length > 0 && (
           <View style={{ marginTop: 14 }}>
@@ -338,7 +360,48 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
       </Modal>
 
       {/* FUND VIRTUAL CARD MODAL */}
-      <Modal visible={Boolean(fundTarget)} transparent animationType="slide" onRequestClose={() => setFundTarget(null)}>
+      <Modal visible={Boolean(cardHistoryTarget)} transparent animationType="slide" onRequestClose={() => setCardHistoryTarget(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: isDark ? '#0F172A' : '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, maxHeight: '72%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: titleColor }}>Card Transaction History</Text>
+                <Text style={{ fontSize: 12, color: mutedColor }}>
+                  {cardHistoryTarget?.card?.currency} {cardHistoryTarget?.card?.cardScheme} ? {cardHistoryTarget?.card?.maskedPan}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setCardHistoryTarget(null)} style={{ padding: 6 }}>
+                <Text style={{ fontWeight: '800', color: theme.primaryColor }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            {cardHistoryTarget?.loading ? (
+              <Text style={{ color: mutedColor, paddingVertical: 20, textAlign: 'center' }}>Loading live card transactions...</Text>
+            ) : (cardHistoryTarget?.transactions || []).length === 0 ? (
+              <Text style={{ color: mutedColor, paddingVertical: 20, textAlign: 'center' }}>No transactions recorded on this card yet.</Text>
+            ) : (
+              <ScrollView>
+                {(cardHistoryTarget?.transactions || []).map((t: any, idx: number) => {
+                  const sym = String(t.currency || cardHistoryTarget?.card?.currency || 'USD').toUpperCase() === 'USD' ? '$' : '\u20a6';
+                  const isCredit = t.direction === 'CREDIT';
+                  return (
+                    <View key={t.id || idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: borderCol }}>
+                      <View style={{ flex: 1, paddingRight: 10 }}>
+                        <Text style={{ fontWeight: '800', fontSize: 13, color: titleColor }}>{t.narrative || t.type}</Text>
+                        <Text style={{ fontSize: 11, color: mutedColor, marginTop: 2 }}>{t.type} ? {t.status} ? {new Date(t.createdAt).toLocaleString()}</Text>
+                      </View>
+                      <Text style={{ fontWeight: '900', fontSize: 13.5, color: isCredit ? '#10B981' : '#EF4444' }}>
+                        {isCredit ? '+' : '-'}{sym}{Number(t.amount || 0).toFixed(2)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+            <Modal visible={Boolean(fundTarget)} transparent animationType="slide" onRequestClose={() => setFundTarget(null)}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
