@@ -119,8 +119,12 @@ export const portalApi = {
     apiRequest(`/api/portal/cards/virtual/${id}/status`, { method: 'PATCH', body: { status } }),
   fundVirtualCard: (id: string, amount: number) =>
     apiRequest(`/api/portal/cards/virtual/${id}/fund`, { method: 'POST', body: { amount } }),
-  orderPhysicalCard: (body: { cardScheme: string; deliveryAddress: string; phone: string }) =>
+  orderPhysicalCard: (body: { cardScheme: string; deliveryAddress: string; phone: string; pin?: string }) =>
     apiRequest('/api/portal/cards/physical-order', { method: 'POST', body }),
+  toggleCardBlock: (kind: 'virtual' | 'physical', id: string, isBlocked: boolean) =>
+    apiRequest(`/api/portal/cards/${kind}/${id}/block`, { method: 'PATCH', body: { isBlocked } }),
+  setCardPin: (kind: 'virtual' | 'physical', id: string, body: { pin: string; oldPin?: string }) =>
+    apiRequest(`/api/portal/cards/${kind}/${id}/pin`, { method: 'POST', body }),
   upgradeKyc: (bvn: string) =>
     apiRequest('/api/portal/kyc/upgrade', { method: 'POST', body: { bvn } }),
   submitKyc: (body: { bvn?: string; nin?: string; rcNumber?: string }) =>

@@ -33,6 +33,11 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
   const [fundTarget, setFundTarget] = useState<any>(null);
   const [fundAmt, setFundAmt] = useState('');
+  const [pinTarget, setPinTarget] = useState<{ kind: 'virtual' | 'physical'; id: string; hasPin: boolean; label: string } | null>(null);
+  const [newCardPin, setNewCardPin] = useState('');
+  const [oldCardPin, setOldCardPin] = useState('');
+  const [orderPin, setOrderPin] = useState('');
+  const physFee = Number(customer?.physicalCardFeeNgn || 1500);
 
   const vCards = Array.isArray(customer?.virtualCards) ? customer.virtualCards : [];
   const pOrders = Array.isArray(customer?.physicalOrders) ? customer.physicalOrders : [];
@@ -53,10 +58,41 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
     }
   };
 
-  const toggleCard = async (id: string, current: string) => {
-    const next = current === 'ACTIVE' ? 'FROZEN' : 'ACTIVE';
-    const res = await portalApi.toggleVirtualCard(id, next);
-    if (res.success) onRefresh();
+  const toggleBlock = async (kind: 'virtual' | 'physical', id: string, isBlocked: boolean) => {
+    setLoading(true);
+    try {
+      const res = await portalApi.toggleCardBlock(kind, id, isBlocked);
+      if (!res.success) return Alert.alert('Card Control', res.error?.message || 'Unable to update card block status.');
+      Alert.alert('Updated ???', `Card ${isBlocked ? 'blocked' : 'unblocked'} successfully.`);
+      onRefresh();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveCardPin = async () => {
+    if (!pinTarget) return;
+    if (!/^\d{4}$/.test(newCardPin.trim())) {
+      return Alert.alert('Invalid PIN', 'Enter a valid 4-digit Card PIN.');
+    }
+    if (pinTarget.hasPin && !/^\d{4}$/.test(oldCardPin.trim())) {
+      return Alert.alert('Current PIN Required', 'Enter your current 4-digit Card PIN to change it.');
+    }
+    setLoading(true);
+    try {
+      const res = await portalApi.setCardPin(pinTarget.kind, pinTarget.id, {
+        pin: newCardPin.trim(),
+        oldPin: pinTarget.hasPin ? oldCardPin.trim() : undefined,
+      });
+      if (!res.success) return Alert.alert('Card PIN', res.error?.message || 'Could not save Card PIN.');
+      Alert.alert('PIN Saved ???', 'Your 4-digit Card PIN has been updated.');
+      setPinTarget(null);
+      setNewCardPin('');
+      setOldCardPin('');
+      onRefresh();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFundCard = async () => {
@@ -78,12 +114,21 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
 
   const orderPhysical = async () => {
     if (!address.trim()) return Alert.alert('Address Required', 'Enter your delivery address.');
+    if (orderPin.trim() && !/^\d{4}$/.test(orderPin.trim())) {
+      return Alert.alert('Invalid PIN', 'Optional Card PIN must be exactly 4 digits.');
+    }
     setLoading(true);
     try {
-      const res = await portalApi.orderPhysicalCard({ cardScheme: 'VERVE', deliveryAddress: address.trim(), phone: phone.trim() });
+      const res = await portalApi.orderPhysicalCard({
+        cardScheme: 'VERVE',
+        deliveryAddress: address.trim(),
+        phone: phone.trim(),
+        pin: orderPin.trim() || undefined,
+      });
       if (!res.success) return Alert.alert('Order Failed', res.error?.message || 'Could not order physical card.');
-      Alert.alert('Ordered ✓', `Physical ATM Card ordered! Tracking: ${res.data?.trackingNumber}`);
+      Alert.alert('Ordered ???', `Physical ATM Card ordered (???${Number(res.data?.feeNgn || physFee).toLocaleString()} deducted)! Tracking: ${res.data?.trackingNumber}`);
       setAddress('');
+      setOrderPin('');
       onRefresh();
     } finally {
       setLoading(false);
@@ -182,9 +227,19 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
                     <Ionicons name="add-circle" size={15} color="#fff" />
                     <Text style={styles.cardActionTxt}>Fund Card</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => toggleCard(vc.id, vc.status)} style={styles.cardActionBtn}>
-                    <Ionicons name={vc.status === 'ACTIVE' ? 'snow' : 'flame'} size={15} color="#fff" />
-                    <Text style={styles.cardActionTxt}>{vc.status === 'ACTIVE' ? 'Freeze' : 'Unfreeze'}</Text>
+                  <TouchableOpacity
+                    onPress={() => toggleBlock('virtual', vc.id, !(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN'))}
+                    style={styles.cardActionBtn}
+                  >
+                    <Ionicons name={(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN') ? 'lock-open' : 'lock-closed'} size={15} color="#fff" />
+                    <Text style={styles.cardActionTxt}>{(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN') ? 'Unblock' : 'Block'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setPinTarget({ kind: 'virtual', id: vc.id, hasPin: Boolean(vc.hasPin), label: `${vc.currency} ${vc.cardScheme} Virtual Card` })}
+                    style={styles.cardActionBtn}
+                  >
+                    <Ionicons name="key" size={15} color="#fff" />
+                    <Text style={styles.cardActionTxt}>{vc.hasPin ? 'PIN' : 'Set PIN'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -195,31 +250,88 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
 
       <Card>
         <Text style={[styles.title, { color: titleColor }]}>Order Physical Chip & PIN ATM Card</Text>
+        <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 10 }}>
+          Card fee (???{physFee.toLocaleString()}) is deducted automatically from your NGN wallet balance.
+        </Text>
         <Field label="Nationwide Delivery Address" value={address} onChangeText={setAddress} placeholder="12 Admiralty Way, Lekki Phase 1, Lagos" />
         <Field label="Contact Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-        <PrimaryButton title="Order Physical ATM Card (₦1,500) →" onPress={orderPhysical} color={theme.primaryColor} disabled={loading} />
+        <Field label="Set 4-Digit Card PIN (Optional)" value={orderPin} onChangeText={setOrderPin} keyboardType="number-pad" maxLength={4} secureTextEntry placeholder="****" />
+        <PrimaryButton title={loading ? 'Processing...' : `Order Physical ATM Card (???${physFee.toLocaleString()}) ???`} onPress={orderPhysical} color={theme.primaryColor} disabled={loading} />
 
         {pOrders.length > 0 && (
           <View style={{ marginTop: 14 }}>
             <Text style={{ fontSize: 12.5, fontWeight: '800', color: titleColor, marginBottom: 8 }}>My Physical Card Orders</Text>
-            {pOrders.map((po: any) => (
-              <View key={po.id} style={[styles.orderRow, { borderColor: borderCol }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '800', fontSize: 13, color: titleColor }}>
-                    {theme.brandName} {po.cardScheme} Physical Card
-                  </Text>
-                  <Text style={{ fontSize: 11.5, color: mutedColor, marginTop: 2 }}>
-                    Tracking: {po.trackingNumber} • {po.deliveryAddress}
-                  </Text>
+            {pOrders.map((po: any) => {
+              const blocked = Boolean(po.isBlocked);
+              const isDone = po.status === 'SHIPPED' || po.status === 'DELIVERED';
+              const isProc = po.status === 'PROCESSED';
+              return (
+                <View key={po.id} style={[styles.orderRow, { borderColor: borderCol, flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '800', fontSize: 13, color: titleColor }}>
+                        {theme.brandName} {po.cardScheme} Physical Card
+                      </Text>
+                      <Text style={{ fontSize: 11.5, color: mutedColor, marginTop: 2 }}>
+                        Tracking: {po.trackingNumber} ??? {po.deliveryAddress}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: mutedColor, marginTop: 2 }}>
+                        Fee Paid: ???{Number(po.feeNgn || 0).toLocaleString()} {po.hasPin ? '??? PIN Set ???' : '??? PIN Not Set'}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                      <View style={{ backgroundColor: isDone ? '#DCFCE7' : isProc ? '#DBEAFE' : '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '900', color: isDone ? '#15803D' : isProc ? '#1D4ED8' : '#B45309' }}>{po.status}</Text>
+                      </View>
+                      {blocked && (
+                        <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+                          <Text style={{ fontSize: 9.5, fontWeight: '900', color: '#B91C1C' }}>BLOCKED ({po.blockedBy || 'USER'})</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => toggleBlock('physical', po.id, !blocked)}
+                      style={{ flex: 1, backgroundColor: blocked ? '#059669' : '#DC2626', paddingVertical: 8, borderRadius: 10, alignItems: 'center' }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 11.5, fontWeight: '800' }}>{blocked ? 'Unblock Card' : 'Block Card'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setPinTarget({ kind: 'physical', id: po.id, hasPin: Boolean(po.hasPin), label: `${po.cardScheme} Physical Card` })}
+                      style={{ flex: 1, backgroundColor: theme.primaryColor, paddingVertical: 8, borderRadius: 10, alignItems: 'center' }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 11.5, fontWeight: '800' }}>{po.hasPin ? 'Change Card PIN' : 'Set Card PIN'}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 }}>
-                  <Text style={{ fontSize: 10.5, fontWeight: '900', color: '#15803D' }}>{po.status}</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </Card>
+
+      {/* SET / CHANGE CARD PIN MODAL */}
+      <Modal visible={Boolean(pinTarget)} transparent animationType="slide" onRequestClose={() => setPinTarget(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { backgroundColor: cardBg }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 17, fontWeight: '900', color: titleColor }}>
+                {pinTarget?.hasPin ? 'Change 4-Digit Card PIN' : 'Set 4-Digit Card PIN'}
+              </Text>
+              <TouchableOpacity onPress={() => setPinTarget(null)}>
+                <Ionicons name="close-circle" size={26} color={mutedColor} />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 12.5, color: mutedColor, marginBottom: 12 }}>{pinTarget?.label}</Text>
+            {pinTarget?.hasPin && (
+              <Field label="Current 4-Digit Card PIN" value={oldCardPin} onChangeText={setOldCardPin} keyboardType="number-pad" maxLength={4} secureTextEntry placeholder="****" />
+            )}
+            <Field label="New 4-Digit Card PIN" value={newCardPin} onChangeText={setNewCardPin} keyboardType="number-pad" maxLength={4} secureTextEntry placeholder="****" />
+            <PrimaryButton title={loading ? 'Saving PIN...' : 'Save Card PIN ???'} onPress={handleSaveCardPin} color={theme.accentColor} disabled={loading} />
+          </View>
+        </View>
+      </Modal>
 
       {/* FUND VIRTUAL CARD MODAL */}
       <Modal visible={Boolean(fundTarget)} transparent animationType="slide" onRequestClose={() => setFundTarget(null)}>
