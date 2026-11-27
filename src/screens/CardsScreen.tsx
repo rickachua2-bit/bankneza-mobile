@@ -266,42 +266,56 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
                 )}
 
                 {/* CARD ACTION BAR: SHOW DETAILS • + FUND CARD • FREEZE */}
+                {/* CARD ACTION GRID: 2 NEAT ROWS x 3 COLUMNS */}
                 <View style={styles.cardActionRow}>
                   <TouchableOpacity
                     onPress={() => toggleReveal(vc)}
                     style={styles.cardActionBtn}
                   >
-                    <Ionicons name={revealed ? 'eye-off' : 'eye'} size={15} color="#fff" />
-                    <Text style={styles.cardActionTxt}>{revealingId === vc.id ? 'Loading...' : revealed ? 'Hide PAN/CVV' : 'Show PAN/CVV'}</Text>
+                    <Ionicons name={revealed ? 'eye-off' : 'eye'} size={17} color="#fff" />
+                    <Text style={styles.cardActionTxt} numberOfLines={1}>
+                      {revealingId === vc.id ? 'Loading...' : revealed ? 'Hide Info' : 'Details'}
+                    </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setFundTarget(vc)} style={[styles.cardActionBtn, { backgroundColor: theme.accentColor }]}>
-                    <Ionicons name="add-circle" size={15} color="#fff" />
-                    <Text style={styles.cardActionTxt}>Fund Card</Text>
+                  <TouchableOpacity
+                    onPress={() => setFundTarget(vc)}
+                    style={[styles.cardActionBtn, { backgroundColor: theme.accentColor }]}
+                  >
+                    <Ionicons name="add-circle" size={17} color="#fff" />
+                    <Text style={styles.cardActionTxt} numberOfLines={1}>Fund</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setWithdrawTarget(vc); setWithdrawAmt(''); setWithdrawDest(vc.currency === 'USD' ? 'USD' : 'NGN'); }} style={styles.cardActionBtn}>
-                    <Ionicons name="arrow-down-circle" size={15} color="#fff" />
-                    <Text style={styles.cardActionTxt}>Withdraw</Text>
+                  <TouchableOpacity
+                    onPress={() => { setWithdrawTarget(vc); setWithdrawAmt(''); setWithdrawDest(vc.currency === 'USD' ? 'USD' : 'NGN'); }}
+                    style={styles.cardActionBtn}
+                  >
+                    <Ionicons name="arrow-down-circle" size={17} color="#fff" />
+                    <Text style={styles.cardActionTxt} numberOfLines={1}>Withdraw</Text>
                   </TouchableOpacity>
+                </View>
+
+                <View style={[styles.cardActionRow, { marginTop: 8 }]}>
                   <TouchableOpacity
                     onPress={() => toggleBlock('virtual', vc.id, !(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN'))}
                     style={styles.cardActionBtn}
                   >
-                    <Ionicons name={(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN') ? 'lock-open' : 'lock-closed'} size={15} color="#fff" />
-                    <Text style={styles.cardActionTxt}>{(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN') ? 'Unblock' : 'Block'}</Text>
+                    <Ionicons name={(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN') ? 'lock-open' : 'lock-closed'} size={17} color="#fff" />
+                    <Text style={styles.cardActionTxt} numberOfLines={1}>
+                      {(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN') ? 'Unblock' : 'Block'}
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setPinTarget({ kind: 'virtual', id: vc.id, hasPin: Boolean(vc.hasPin), label: `${vc.currency} ${vc.cardScheme} Virtual Card` })}
                     style={styles.cardActionBtn}
                   >
-                    <Ionicons name="key" size={15} color="#fff" />
-                    <Text style={styles.cardActionTxt}>{vc.hasPin ? 'PIN' : 'Set PIN'}</Text>
+                    <Ionicons name="key" size={17} color="#fff" />
+                    <Text style={styles.cardActionTxt} numberOfLines={1}>{vc.hasPin ? 'Change PIN' : 'Set PIN'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => openCardHistory(vc)}
                     style={styles.cardActionBtn}
                   >
-                    <Ionicons name="time" size={15} color="#fff" />
-                    <Text style={styles.cardActionTxt}>History</Text>
+                    <Ionicons name="time" size={17} color="#fff" />
+                    <Text style={styles.cardActionTxt} numberOfLines={1}>History</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -313,7 +327,7 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
       <Card>
         <Text style={[styles.title, { color: titleColor }]}>Order Physical Chip & PIN ATM Card</Text>
         <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 10 }}>
-          Card fee (\u20a6{physFee.toLocaleString()}) is deducted automatically from your NGN wallet balance.
+          Card fee ({'\u20a6'}{physFee.toLocaleString()}) is deducted automatically from your NGN wallet balance.
         </Text>
         <Field label="Nationwide Delivery Address" value={address} onChangeText={setAddress} placeholder="12 Admiralty Way, Lekki Phase 1, Lagos" />
         <Field label="Contact Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
@@ -532,15 +546,16 @@ const styles = StyleSheet.create({
   cardActionRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
   cardActionBtn: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingVertical: 9,
-    borderRadius: 10,
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 12,
   },
-  cardActionTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  cardActionTxt: { color: '#fff', fontSize: 11.5, fontWeight: '800', letterSpacing: 0.2 },
   orderRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, gap: 10 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.58)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
