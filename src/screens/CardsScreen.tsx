@@ -47,6 +47,30 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
     }
   };
   const [fundTarget, setFundTarget] = useState<any>(null);
+  const [withdrawTarget, setWithdrawTarget] = useState<any>(null);
+  const [withdrawAmt, setWithdrawAmt] = useState('');
+  const [withdrawDest, setWithdrawDest] = useState<'USD' | 'NGN'>('USD');
+
+  const submitWithdraw = async () => {
+    if (!withdrawTarget) return;
+    const amt = Number(withdrawAmt);
+    if (!amt || amt <= 0) return Alert.alert('Invalid Amount', 'Enter a valid amount to withdraw from your card.');
+    setLoading(true);
+    try {
+      const res = await portalApi.withdrawVirtualCard(withdrawTarget.id, {
+        amount: amt,
+        destinationCurrency: withdrawTarget.currency === 'USD' ? withdrawDest : 'NGN',
+      });
+      if (!res.success) return Alert.alert('Withdrawal Failed', res.error?.message || 'Unable to unload card.');
+      const sym = withdrawTarget.currency === 'USD' ? '$' : '\u20a6';
+      Alert.alert('Card Unloaded', `${sym}${amt.toFixed(2)} withdrawn from your card into your ${res.data?.creditedCurrency || withdrawDest} wallet.`);
+      setWithdrawTarget(null);
+      setWithdrawAmt('');
+      onRefresh();
+    } finally {
+      setLoading(false);
+    }
+  };
   const [fundAmt, setFundAmt] = useState('');
   const [liveUsdRate, setLiveUsdRate] = useState<number>(0);
 
@@ -254,6 +278,10 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
                     <Ionicons name="add-circle" size={15} color="#fff" />
                     <Text style={styles.cardActionTxt}>Fund Card</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setWithdrawTarget(vc); setWithdrawAmt(''); setWithdrawDest(vc.currency === 'USD' ? 'USD' : 'NGN'); }} style={styles.cardActionBtn}>
+                    <Ionicons name="arrow-down-circle" size={15} color="#fff" />
+                    <Text style={styles.cardActionTxt}>Withdraw</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => toggleBlock('virtual', vc.id, !(vc.isBlocked || vc.status === 'BLOCKED' || vc.status === 'FROZEN'))}
                     style={styles.cardActionBtn}
@@ -405,6 +433,46 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
                 })}
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+            <Modal visible={Boolean(withdrawTarget)} transparent animationType="slide" onRequestClose={() => setWithdrawTarget(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: isDark ? '#0F172A' : '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ fontSize: 16, fontWeight: '900', color: titleColor }}>Withdraw / Unload {withdrawTarget?.currency} Card</Text>
+              <TouchableOpacity onPress={() => setWithdrawTarget(null)} style={{ padding: 4 }}>
+                <Text style={{ fontWeight: '800', color: theme.primaryColor }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 12, color: mutedColor, marginBottom: 12 }}>
+              Available on card: {withdrawTarget?.currency === 'USD' ? '$' : '\u20a6'}{Number(withdrawTarget?.balance || 0).toFixed(2)} ({withdrawTarget?.maskedPan})
+            </Text>
+            <Field
+              label={`Amount to Withdraw (${withdrawTarget?.currency || 'USD'})`}
+              value={withdrawAmt}
+              onChangeText={setWithdrawAmt}
+              keyboardType="decimal-pad"
+              placeholder="e.g. 2"
+            />
+            {withdrawTarget?.currency === 'USD' && (
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setWithdrawDest('USD')}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: withdrawDest === 'USD' ? theme.primaryColor : (isDark ? '#1E293B' : '#F1F5F9') }}
+                >
+                  <Text style={{ fontWeight: '800', fontSize: 12, color: withdrawDest === 'USD' ? '#fff' : titleColor }}>Credit USD Wallet</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setWithdrawDest('NGN')}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: withdrawDest === 'NGN' ? theme.primaryColor : (isDark ? '#1E293B' : '#F1F5F9') }}
+                >
+                  <Text style={{ fontWeight: '800', fontSize: 12, color: withdrawDest === 'NGN' ? '#fff' : titleColor }}>Credit NGN Wallet</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <PrimaryButton title={loading ? 'Processing...' : 'Confirm Card Withdrawal'} onPress={submitWithdraw} color={theme.primaryColor} disabled={loading} />
           </View>
         </View>
       </Modal>

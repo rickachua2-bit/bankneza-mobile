@@ -119,6 +119,8 @@ export const portalApi = {
     apiRequest(`/api/portal/cards/virtual/${id}/details`),
   getVirtualCardTransactions: (id: string) =>
     apiRequest(`/api/portal/cards/virtual/${id}/transactions`),
+  withdrawVirtualCard: (id: string, body: { amount: number; destinationCurrency?: 'USD' | 'NGN' }) =>
+    apiRequest(`/api/portal/cards/virtual/${id}/withdraw`, { method: 'POST', body }),
   toggleVirtualCard: (id: string, status: 'ACTIVE' | 'FROZEN') =>
     apiRequest(`/api/portal/cards/virtual/${id}/status`, { method: 'PATCH', body: { status } }),
   fundVirtualCard: (id: string, amount: number) =>
