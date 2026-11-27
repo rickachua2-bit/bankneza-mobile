@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '../components/AppIcons';
@@ -48,6 +48,14 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
   };
   const [fundTarget, setFundTarget] = useState<any>(null);
   const [fundAmt, setFundAmt] = useState('');
+  const [liveUsdRate, setLiveUsdRate] = useState<number>(0);
+
+  useEffect(() => {
+    portalApi.getFxRates().then((res: any) => {
+      const r = Number(res?.data?.rates?.NGN_USD_PRICE || res?.rates?.NGN_USD_PRICE || 0);
+      if (r > 0) setLiveUsdRate(r);
+    }).catch(() => {});
+  }, []);
   const [pinTarget, setPinTarget] = useState<{ kind: 'virtual' | 'physical'; id: string; hasPin: boolean; label: string } | null>(null);
   const [newCardPin, setNewCardPin] = useState('');
   const [oldCardPin, setOldCardPin] = useState('');
@@ -414,7 +422,7 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
             </View>
             <Text style={{ fontSize: 12.5, color: mutedColor, marginBottom: 12 }}>
               {fundTarget?.currency === 'USD'
-                ? 'Top up your USD card from your NGN wallet (Indicative rate: $1 = ₦1,620).'
+                ? (liveUsdRate > 0 ? `Top up your USD card from your USD, USDT, or NGN wallet (Live rate: $1 = \u20a6${liveUsdRate.toLocaleString('en-NG')}).` : 'Top up your USD card at the live real-time FX rate.')
                 : 'Top up your NGN card instantly from your NGN wallet balance.'}
             </Text>
             <Field
@@ -426,7 +434,7 @@ export function CardsScreen({ customer, onRefresh }: { customer: any; onRefresh:
             />
             {fundTarget?.currency === 'USD' && Number(fundAmt) > 0 && (
               <Text style={{ fontSize: 12, fontWeight: '800', color: theme.accentColor, marginBottom: 12 }}>
-                Wallet Debit: ₦{(Number(fundAmt) * 1620).toLocaleString()}
+                Wallet Debit: {liveUsdRate > 0 ? `\u20a6${Math.ceil(Number(fundAmt) * liveUsdRate).toLocaleString('en-NG')}` : `$${Number(fundAmt).toFixed(2)} USD`}
               </Text>
             )}
             <PrimaryButton
